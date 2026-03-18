@@ -26,7 +26,7 @@
 
   "kv_namespaces": [
     {
-      "binding": "KV",
+      "binding": "omni-stock",
       "id": "5a348d7010e34e04a772c6df645228b4"
     }
   ],

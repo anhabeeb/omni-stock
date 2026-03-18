@@ -30,8 +30,14 @@ export interface Settings {
 export class SettingsService {
   constructor(private db: any) {}
 
-  async getSettings(): Promise<Settings> {
-    return await this.db.prepare("SELECT * FROM settings WHERE id = 1").first() as Settings;
+  async getSettings(): Promise<Settings | null> {
+    try {
+      const settings = await this.db.prepare("SELECT * FROM settings WHERE id = 1").first() as Settings;
+      return settings || null;
+    } catch (e) {
+      console.error("Failed to fetch settings:", e);
+      return null;
+    }
   }
 
   async updateSettings(settings: Partial<Settings>): Promise<void> {
@@ -50,6 +56,14 @@ export class SettingsService {
 
   async getPublicSettings(): Promise<Partial<Settings>> {
     const settings = await this.getSettings();
+    if (!settings) {
+      return {
+        system_name: 'OmniStock',
+        default_theme: 'dark',
+        dark_mode_enabled: 1,
+        light_mode_enabled: 1
+      };
+    }
     return {
       system_name: settings.system_name,
       company_name: settings.company_name,
