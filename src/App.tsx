@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { 
   BrowserRouter as Router, 
   Routes, 
@@ -43,33 +43,35 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 // --- Components ---
-import GRNForm from "./components/Inventory/GRNForm";
-import StockIssueForm from "./components/Inventory/StockIssueForm";
-import TransferForm from "./components/Inventory/TransferForm";
-import AdjustmentForm from "./components/Inventory/AdjustmentForm";
-import BatchStock from "./components/Inventory/BatchStock";
-import ExpiryAlerts from "./components/Inventory/ExpiryAlerts";
-import MovementLedger from "./components/Inventory/MovementLedger";
-import AnalyticsDashboard from "./components/Dashboard/AnalyticsDashboard";
-import Reports from "./components/Dashboard/Reports";
-import StockCount from "./components/Inventory/StockCount";
-import Wastage from "./components/Inventory/Wastage";
-import Alerts from "./components/Inventory/Alerts";
-import MobileLayout from "./components/Layout/MobileLayout";
-import MobileDashboard from "./components/Dashboard/MobileDashboard";
-import MobileInventory from "./components/Inventory/MobileInventory";
-import MobileOperations from "./components/Operations/MobileOperations";
-import SmartAlertsCenter from "./components/Alerts/SmartAlertsCenter";
-import FinanceDashboard from "./components/Finance/FinanceDashboard";
+const GRNForm = lazy(() => import("./components/Inventory/GRNForm"));
+const StockIssueForm = lazy(() => import("./components/Inventory/StockIssueForm"));
+const TransferForm = lazy(() => import("./components/Inventory/TransferForm"));
+const AdjustmentForm = lazy(() => import("./components/Inventory/AdjustmentForm"));
+const BatchStock = lazy(() => import("./components/Inventory/BatchStock"));
+const ExpiryAlerts = lazy(() => import("./components/Inventory/ExpiryAlerts"));
+const MovementLedger = lazy(() => import("./components/Inventory/MovementLedger"));
+const AnalyticsDashboard = lazy(() => import("./components/Dashboard/AnalyticsDashboard"));
+const Reports = lazy(() => import("./components/Dashboard/Reports"));
+const StockCount = lazy(() => import("./components/Inventory/StockCount"));
+const Wastage = lazy(() => import("./components/Inventory/Wastage"));
+const Alerts = lazy(() => import("./components/Inventory/Alerts"));
+const MobileLayout = lazy(() => import("./components/Layout/MobileLayout"));
+const MobileDashboard = lazy(() => import("./components/Dashboard/MobileDashboard"));
+const MobileInventory = lazy(() => import("./components/Inventory/MobileInventory"));
+const MobileOperations = lazy(() => import("./components/Operations/MobileOperations"));
+const SmartAlertsCenter = lazy(() => import("./components/Alerts/SmartAlertsCenter"));
+const FinanceDashboard = lazy(() => import("./components/Finance/FinanceDashboard"));
 
 // --- Phase 5 Components ---
-import { KPIDashboard } from "./components/Intelligence/KPIDashboard";
-import { WastageAnalytics } from "./components/Intelligence/WastageAnalytics";
-import { ExpiryRiskDashboard } from "./components/Intelligence/ExpiryRiskDashboard";
-import { DiscrepancyAnalytics } from "./components/Intelligence/DiscrepancyAnalytics";
-import { StockRequestList } from "./components/Operations/StockRequestList";
-import { StockRequestForm } from "./components/Operations/StockRequestForm";
-import { NotificationCenter } from "./components/Layout/NotificationCenter";
+const KPIDashboard = lazy(() => import("./components/Intelligence/KPIDashboard").then(m => ({ default: m.KPIDashboard })));
+const WastageAnalytics = lazy(() => import("./components/Intelligence/WastageAnalytics").then(m => ({ default: m.WastageAnalytics })));
+const ExpiryRiskDashboard = lazy(() => import("./components/Intelligence/ExpiryRiskDashboard").then(m => ({ default: m.ExpiryRiskDashboard })));
+const DiscrepancyAnalytics = lazy(() => import("./components/Intelligence/DiscrepancyAnalytics").then(m => ({ default: m.DiscrepancyAnalytics })));
+const StockRequestList = lazy(() => import("./components/Operations/StockRequestList").then(m => ({ default: m.StockRequestList })));
+const StockRequestForm = lazy(() => import("./components/Operations/StockRequestForm").then(m => ({ default: m.StockRequestForm })));
+const NotificationCenter = lazy(() => import("./components/Layout/NotificationCenter").then(m => ({ default: m.NotificationCenter })));
+
+import { LoadingSkeleton, TableSkeleton } from "./components/Common/LoadingSkeleton";
 
 // --- Utils ---
 function useWindowSize() {
@@ -230,86 +232,88 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
         </header>
 
         <div className="flex-1 overflow-y-auto p-8 bg-slate-950/50">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Routes>
-                <Route path="/" element={<DashboardPage />} />
-                <Route path="/analytics" element={<AnalyticsDashboard />} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/alerts" element={<Alerts />} />
-                <Route path="/smart-alerts" element={<SmartAlertsCenter />} />
-                <Route path="/finance" element={<FinanceDashboard />} />
-                <Route path="/stock-count" element={<StockCount />} />
-                <Route path="/wastage" element={<Wastage />} />
-                <Route path="/grn/new" element={<GRNForm />} />
-                <Route path="/issues/new" element={<StockIssueForm />} />
-                <Route path="/transfers/new" element={<TransferForm />} />
-                <Route path="/adjustments/new" element={<AdjustmentForm />} />
-                <Route path="/stock" element={<BatchStock />} />
-                <Route path="/expiry" element={<ExpiryAlerts />} />
-                <Route path="/ledger" element={<MovementLedger />} />
-                
-                {/* Phase 5 Routes */}
-                <Route path="/intelligence/kpis" element={<KPIDashboard />} />
-                <Route path="/intelligence/wastage" element={<WastageAnalytics />} />
-                <Route path="/intelligence/expiry" element={<ExpiryRiskDashboard />} />
-                <Route path="/intelligence/shrinkage" element={<DiscrepancyAnalytics />} />
-                <Route path="/requests" element={<StockRequestList onNewRequest={() => window.location.href = '/requests/new'} onViewRequest={(id) => window.location.href = `/requests/${id}`} />} />
-                <Route path="/requests/new" element={<StockRequestForm onClose={() => window.location.href = '/requests'} onSuccess={() => window.location.href = '/requests'} />} />
-                <Route path="/requests/:id" element={<StockRequestForm requestId={window.location.pathname.split('/').pop()} onClose={() => window.location.href = '/requests'} onSuccess={() => window.location.href = '/requests'} />} />
+          <Suspense fallback={<LoadingSkeleton />}>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={location.pathname}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Routes>
+                  <Route path="/" element={<DashboardPage />} />
+                  <Route path="/analytics" element={<AnalyticsDashboard />} />
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/alerts" element={<Alerts />} />
+                  <Route path="/smart-alerts" element={<SmartAlertsCenter />} />
+                  <Route path="/finance" element={<FinanceDashboard />} />
+                  <Route path="/stock-count" element={<StockCount />} />
+                  <Route path="/wastage" element={<Wastage />} />
+                  <Route path="/grn/new" element={<GRNForm />} />
+                  <Route path="/issues/new" element={<StockIssueForm />} />
+                  <Route path="/transfers/new" element={<TransferForm />} />
+                  <Route path="/adjustments/new" element={<AdjustmentForm />} />
+                  <Route path="/stock" element={<BatchStock />} />
+                  <Route path="/expiry" element={<ExpiryAlerts />} />
+                  <Route path="/ledger" element={<MovementLedger />} />
+                  
+                  {/* Phase 5 Routes */}
+                  <Route path="/intelligence/kpis" element={<KPIDashboard />} />
+                  <Route path="/intelligence/wastage" element={<WastageAnalytics />} />
+                  <Route path="/intelligence/expiry" element={<ExpiryRiskDashboard />} />
+                  <Route path="/intelligence/shrinkage" element={<DiscrepancyAnalytics />} />
+                  <Route path="/requests" element={<StockRequestList onNewRequest={() => window.location.href = '/requests/new'} onViewRequest={(id) => window.location.href = `/requests/${id}`} />} />
+                  <Route path="/requests/new" element={<StockRequestForm onClose={() => window.location.href = '/requests'} onSuccess={() => window.location.href = '/requests'} />} />
+                  <Route path="/requests/:id" element={<StockRequestForm requestId={window.location.pathname.split('/').pop()} onClose={() => window.location.href = '/requests'} onSuccess={() => window.location.href = '/requests'} />} />
 
-                <Route path="/items" element={
-                  <MasterListPage 
-                    title="Items Master" 
-                    endpoint="items" 
-                    columns={[
-                      { key: "sku", label: "SKU" },
-                      { key: "name", label: "Item Name" },
-                      { key: "reorder_level", label: "Reorder Level" }
-                    ]} 
-                  />
-                } />
-                <Route path="/suppliers" element={
-                  <MasterListPage 
-                    title="Suppliers" 
-                    endpoint="suppliers" 
-                    columns={[
-                      { key: "code", label: "Code" },
-                      { key: "name", label: "Supplier Name" },
-                      { key: "phone", label: "Phone" }
-                    ]} 
-                  />
-                } />
-                <Route path="/godowns" element={
-                  <MasterListPage 
-                    title="Godowns" 
-                    endpoint="godowns" 
-                    columns={[
-                      { key: "code", label: "Code" },
-                      { key: "name", label: "Godown Name" }
-                    ]} 
-                  />
-                } />
-                <Route path="/outlets" element={
-                  <MasterListPage 
-                    title="Outlets" 
-                    endpoint="outlets" 
-                    columns={[
-                      { key: "code", label: "Code" },
-                      { key: "name", label: "Outlet Name" }
-                    ]} 
-                  />
-                } />
-                <Route path="*" element={<Navigate to="/" />} />
-              </Routes>
-            </motion.div>
-          </AnimatePresence>
+                  <Route path="/items" element={
+                    <MasterListPage 
+                      title="Items Master" 
+                      endpoint="items" 
+                      columns={[
+                        { key: "sku", label: "SKU" },
+                        { key: "name", label: "Item Name" },
+                        { key: "reorder_level", label: "Reorder Level" }
+                      ]} 
+                    />
+                  } />
+                  <Route path="/suppliers" element={
+                    <MasterListPage 
+                      title="Suppliers" 
+                      endpoint="suppliers" 
+                      columns={[
+                        { key: "code", label: "Code" },
+                        { key: "name", label: "Supplier Name" },
+                        { key: "phone", label: "Phone" }
+                      ]} 
+                    />
+                  } />
+                  <Route path="/godowns" element={
+                    <MasterListPage 
+                      title="Godowns" 
+                      endpoint="godowns" 
+                      columns={[
+                        { key: "code", label: "Code" },
+                        { key: "name", label: "Godown Name" }
+                      ]} 
+                    />
+                  } />
+                  <Route path="/outlets" element={
+                    <MasterListPage 
+                      title="Outlets" 
+                      endpoint="outlets" 
+                      columns={[
+                        { key: "code", label: "Code" },
+                        { key: "name", label: "Outlet Name" }
+                      ]} 
+                    />
+                  } />
+                  <Route path="*" element={<Navigate to="/" />} />
+                </Routes>
+              </motion.div>
+            </AnimatePresence>
+          </Suspense>
         </div>
       </main>
     </div>
@@ -410,7 +414,8 @@ const DashboardPage = () => {
       if (!res.ok) throw new Error("Failed to fetch dashboard summary");
       return res.json();
     },
-    staleTime: 30000, // 30 seconds as per worker cache
+    staleTime: 60000, // 60 seconds
+    gcTime: 1000 * 60 * 10, // 10 minutes
   });
 
   const { data: recentMovements = [], isLoading: movementsLoading } = useQuery<any[]>({
@@ -425,6 +430,7 @@ const DashboardPage = () => {
       return Array.isArray(data) ? data.slice(0, 5) : [];
     },
     staleTime: 60000, // 60 seconds
+    gcTime: 1000 * 60 * 10, // 10 minutes
   });
 
   if (statsLoading || movementsLoading) return (
@@ -557,8 +563,11 @@ const MasterListPage = ({ title, endpoint, columns }: { title: string, endpoint:
       if (!res.ok) throw new Error(`Failed to fetch ${endpoint}`);
       return res.json();
     },
-    staleTime: 1000 * 60 * 10, // 10 minutes as per worker cache
+    staleTime: 1000 * 60 * 15, // 15 minutes
+    gcTime: 1000 * 60 * 30, // 30 minutes
   });
+
+  if (isLoading) return <TableSkeleton />;
 
   return (
     <div className="space-y-6">
@@ -664,34 +673,36 @@ export default function App() {
   if (user && isMobile) {
     return (
       <Router>
-        <MobileLayout 
-          user={user} 
-          activeTab={mobileTab} 
-          onTabChange={setMobileTab}
-          onLogout={handleLogout}
-        >
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={mobileTab}
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              {mobileTab === 'dashboard' && <MobileDashboard user={user} onTabChange={setMobileTab} />}
-              {mobileTab === 'inventory' && <MobileInventory />}
-              {mobileTab === 'operations' && <MobileOperations onAction={setMobileTab} />}
-              {mobileTab === 'alerts' && <SmartAlertsCenter />}
-              {mobileTab === 'smart-alerts' && <SmartAlertsCenter />}
-              {mobileTab === 'grn' && <GRNForm />}
-              {mobileTab === 'issue' && <StockIssueForm />}
-              {mobileTab === 'transfer' && <TransferForm />}
-              {mobileTab === 'stock-count' && <StockCount />}
-              {mobileTab === 'wastage' && <Wastage />}
-              {mobileTab === 'finance' && <FinanceDashboard />}
-            </motion.div>
-          </AnimatePresence>
-        </MobileLayout>
+        <Suspense fallback={<LoadingSkeleton />}>
+          <MobileLayout 
+            user={user} 
+            activeTab={mobileTab} 
+            onTabChange={setMobileTab}
+            onLogout={handleLogout}
+          >
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={mobileTab}
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {mobileTab === 'dashboard' && <MobileDashboard user={user} onTabChange={setMobileTab} />}
+                {mobileTab === 'inventory' && <MobileInventory />}
+                {mobileTab === 'operations' && <MobileOperations onAction={setMobileTab} />}
+                {mobileTab === 'alerts' && <SmartAlertsCenter />}
+                {mobileTab === 'smart-alerts' && <SmartAlertsCenter />}
+                {mobileTab === 'grn' && <GRNForm />}
+                {mobileTab === 'issue' && <StockIssueForm />}
+                {mobileTab === 'transfer' && <TransferForm />}
+                {mobileTab === 'stock-count' && <StockCount />}
+                {mobileTab === 'wastage' && <Wastage />}
+                {mobileTab === 'finance' && <FinanceDashboard />}
+              </motion.div>
+            </AnimatePresence>
+          </MobileLayout>
+        </Suspense>
       </Router>
     );
   }

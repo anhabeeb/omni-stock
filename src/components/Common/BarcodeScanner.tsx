@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from 'react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
 import { X } from 'lucide-react';
 
 interface BarcodeScannerProps {
@@ -8,31 +7,36 @@ interface BarcodeScannerProps {
 }
 
 export default function BarcodeScanner({ onScan, onClose }: BarcodeScannerProps) {
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
-
   useEffect(() => {
-    scannerRef.current = new Html5QrcodeScanner(
-      "reader",
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      /* verbose= */ false
-    );
+    let scanner: any = null;
 
-    scannerRef.current.render(
-      (decodedText) => {
-        onScan(decodedText);
-        if (scannerRef.current) {
-          scannerRef.current.clear();
+    const initScanner = async () => {
+      const { Html5QrcodeScanner } = await import('html5-qrcode');
+      scanner = new Html5QrcodeScanner(
+        "reader",
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        /* verbose= */ false
+      );
+
+      scanner.render(
+        (decodedText: string) => {
+          onScan(decodedText);
+          if (scanner) {
+            scanner.clear();
+          }
+          onClose();
+        },
+        (error: any) => {
+          // console.warn(error);
         }
-        onClose();
-      },
-      (error) => {
-        // console.warn(error);
-      }
-    );
+      );
+    };
+
+    initScanner();
 
     return () => {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(error => console.error("Failed to clear scanner", error));
+      if (scanner) {
+        scanner.clear().catch((error: any) => console.error("Failed to clear scanner", error));
       }
     };
   }, []);

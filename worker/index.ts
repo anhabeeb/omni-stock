@@ -1,5 +1,24 @@
 /// <reference types="@cloudflare/workers-types" />
 import { Hono } from 'hono';
+import { z } from 'zod';
+
+const grnSchema = z.object({
+  grn_number: z.string().min(1).max(50),
+  supplier_id: z.string().uuid(),
+  received_date: z.string().datetime(),
+  godown_id: z.string().uuid(),
+  remarks: z.string().optional(),
+  items: z.array(z.object({
+    item_id: z.string().uuid(),
+    entered_quantity: z.number().positive(),
+    entered_unit_id: z.number().int().positive(),
+    unit_cost: z.number().nonnegative(),
+    total_line_cost: z.number().nonnegative(),
+    batch_number: z.string().optional(),
+    manufacture_date: z.string().optional(),
+    expiry_date: z.string().optional(),
+  })).min(1),
+});
 import { jwt, sign, verify } from 'hono/jwt';
 import { cors } from 'hono/cors';
 import { InventoryService } from './services/inventory';
@@ -146,19 +165,21 @@ app.get("/api/grn", authMiddleware, async (c) => {
 });
 
 app.post("/api/grn", authMiddleware, checkRole(['super_admin', 'warehouse_manager', 'warehouse_staff']), async (c) => {
-  const body = await c.req.json();
-  const id = crypto.randomUUID();
-  const user = c.get('jwtPayload') as any;
-  const inventoryService = new InventoryService(c.env.DB);
-  
-  const statements: any[] = [];
-  statements.push(c.env.DB.prepare(`
-    INSERT INTO goods_receipts (id, grn_number, supplier_id, received_date, godown_id, remarks, status, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, 'draft', ?)
-  `).bind(id, body.grn_number, body.supplier_id, body.received_date, body.godown_id, body.remarks, user.id));
+  try {
+    const body = await c.req.json();
+    const validatedData = grnSchema.parse(body);
+    
+    const id = crypto.randomUUID();
+    const user = c.get('jwtPayload') as any;
+    const inventoryService = new InventoryService(c.env.DB);
+    
+    const statements: any[] = [];
+    statements.push(c.env.DB.prepare(`
+      INSERT INTO goods_receipts (id, grn_number, supplier_id, received_date, godown_id, remarks, status, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, 'draft', ?)
+    `).bind(id, validatedData.grn_number, validatedData.supplier_id, validatedData.received_date, validatedData.godown_id, validatedData.remarks, user.id));
 
-  if (body.items && body.items.length > 0) {
-    for (const item of body.items) {
+    for (const item of validatedData.items) {
       const baseQty = await inventoryService.convertToBaseQuantity(item.item_id, item.entered_unit_id, item.entered_quantity);
       statements.push(c.env.DB.prepare(`
         INSERT INTO goods_receipt_items (
@@ -170,14 +191,15 @@ app.post("/api/grn", authMiddleware, checkRole(['super_admin', 'warehouse_manage
         item.batch_number, item.manufacture_date, item.expiry_date, item.unit_cost, item.total_line_cost
       ));
     }
-  }
 
-  try {
     await c.env.DB.batch(statements);
     await CacheManager.invalidate(c);
-    return c.json({ id, message: "GRN created successfully" });
-  } catch (e: any) {
-    return c.json({ message: e.message }, 400);
+    return c.json({ id, message: "GRN created successfully" }, 201);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return c.json({ error: "Validation failed", details: error.issues }, 400);
+    }
+    return c.json({ message: error instanceof Error ? error.message : "Failed to create GRN" }, 400);
   }
 });
 
@@ -467,8 +489,10 @@ app.get("/api/dashboard/stock-by-category", authMiddleware, async (c) => {
 app.get("/api/dashboard/fast-moving", authMiddleware, async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
+  const limit = parseInt(c.req.query('limit') || "10");
+  const offset = parseInt(c.req.query('offset') || "0");
   const reportingService = new ReportingService(c.env.DB);
-  const data = await reportingService.getFastMoving();
+  const data = await reportingService.getFastMoving(limit, offset);
   return CacheManager.put(c, c.json(data), 60);
 });
 
@@ -478,6 +502,9 @@ app.get("/api/reports/current-stock", authMiddleware, async (c) => {
   if (cached) return cached;
   const godownId = c.req.query('godownId');
   const categoryId = c.req.query('categoryId');
+  const limit = parseInt(c.req.query('limit') || "50");
+  const offset = parseInt(c.req.query('offset') || "0");
+  
   let sql = `
     SELECT s.*, i.name as item_name, i.sku as item_sku, g.name as godown_name, c.name as category_name
     FROM inventory_balance_summary s
@@ -490,6 +517,9 @@ app.get("/api/reports/current-stock", authMiddleware, async (c) => {
   if (godownId) { sql += " AND s.godown_id = ?"; params.push(godownId); }
   if (categoryId) { sql += " AND i.category_id = ?"; params.push(categoryId); }
   
+  sql += " ORDER BY i.name ASC LIMIT ? OFFSET ?";
+  params.push(limit, offset);
+  
   const { results } = await c.env.DB.prepare(sql).bind(...params).all();
   return CacheManager.put(c, c.json(results), 60);
 });
@@ -497,7 +527,10 @@ app.get("/api/reports/current-stock", authMiddleware, async (c) => {
 app.get("/api/reports/movements", authMiddleware, async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
-  const { from, to, itemId, godownId, movementType } = c.req.query();
+  const { from, to, itemId, godownId, movementType, limit = "50", offset = "0" } = c.req.query();
+  const nLimit = parseInt(limit);
+  const nOffset = parseInt(offset);
+  
   let sql = `
     SELECT m.*, i.name as item_name, g.name as godown_name
     FROM stock_movements m
@@ -512,7 +545,9 @@ app.get("/api/reports/movements", authMiddleware, async (c) => {
   if (godownId) { sql += " AND m.godown_id = ?"; params.push(godownId); }
   if (movementType) { sql += " AND m.movement_type = ?"; params.push(movementType); }
   
-  sql += " ORDER BY m.movement_date DESC, m.created_at DESC";
+  sql += " ORDER BY m.movement_date DESC, m.created_at DESC LIMIT ? OFFSET ?";
+  params.push(nLimit, nOffset);
+  
   const { results } = await c.env.DB.prepare(sql).bind(...params).all();
   return CacheManager.put(c, c.json(results), 60);
 });
@@ -521,8 +556,21 @@ app.get("/api/reports/valuation", authMiddleware, async (c) => {
   const cached = await CacheManager.get(c, 120);
   if (cached) return cached;
   const groupBy = (c.req.query('groupBy') || 'item') as any;
+  const limit = parseInt(c.req.query('limit') || "50");
+  const offset = parseInt(c.req.query('offset') || "0");
   const reportingService = new ReportingService(c.env.DB);
-  const data = await reportingService.getValuationReport(groupBy);
+  const data = await reportingService.getValuationReport(groupBy, limit, offset);
+  return CacheManager.put(c, c.json(data), 120);
+});
+
+app.get("/api/reports/dead-stock", authMiddleware, async (c) => {
+  const cached = await CacheManager.get(c, 120);
+  if (cached) return cached;
+  const days = parseInt(c.req.query('days') || "90");
+  const limit = parseInt(c.req.query('limit') || "50");
+  const offset = parseInt(c.req.query('offset') || "0");
+  const reportingService = new ReportingService(c.env.DB);
+  const data = await reportingService.getDeadStock(days, limit, offset);
   return CacheManager.put(c, c.json(data), 120);
 });
 

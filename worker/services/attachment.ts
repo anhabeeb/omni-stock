@@ -9,9 +9,26 @@ export class AttachmentService {
   }
 
   async uploadAttachment(userId: string, entityType: string, entityId: string, file: File) {
+    // Security: Validate file size (max 5MB)
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      throw new Error("File size exceeds 5MB limit");
+    }
+
+    // Security: Validate file type
+    const ALLOWED_TYPES = [
+      'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+      'application/pdf', 'application/msword', 
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain', 'application/zip'
+    ];
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      throw new Error("File type not allowed");
+    }
+
     const id = this.generateId();
     const now = new Date().toISOString();
-    const key = `attachments/${entityType}/${entityId}/${id}-${file.name}`;
+    const key = `attachments/${entityType}/${entityId}/${id}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
 
     // Upload to R2
     await this.bucket.put(key, file.stream(), {
