@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSettings } from '../../contexts/SettingsContext';
+import { cn } from '../../utils/cn';
 
 export default function SettingsPage() {
   const { settings, updateSettings, theme, setTheme, isLoading } = useSettings();
@@ -319,8 +320,4 @@ export default function SettingsPage() {
       </div>
     </div>
   );
-}
-
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
 }

@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Save, ArrowLeft, Search } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useSettings } from '../../contexts/SettingsContext';
 
 const AdjustmentForm: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { format } = useSettings();
   const [batches, setBatches] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
@@ -154,6 +156,8 @@ const AdjustmentForm: React.FC = () => {
                   <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Type</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Qty</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Unit</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Unit Cost</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Total</th>
                   <th className="px-6 py-4"></th>
                 </tr>
               </thead>
@@ -213,7 +217,9 @@ const AdjustmentForm: React.FC = () => {
                         value={item.entered_quantity}
                         onChange={e => {
                           const newItems = [...formData.items];
-                          newItems[index].entered_quantity = parseFloat(e.target.value);
+                          const qty = parseFloat(e.target.value);
+                          newItems[index].entered_quantity = qty;
+                          newItems[index].total_cost = qty * newItems[index].unit_cost;
                           setFormData({...formData, items: newItems});
                         }}
                         className="bg-slate-800 border-none rounded-lg px-3 py-2 text-white w-24"
@@ -233,6 +239,24 @@ const AdjustmentForm: React.FC = () => {
                         <option value="">Unit</option>
                         {units.map(u => <option key={u.id} value={u.id}>{u.code}</option>)}
                       </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      <input 
+                        type="number" 
+                        required
+                        value={item.unit_cost}
+                        onChange={e => {
+                          const newItems = [...formData.items];
+                          const cost = parseFloat(e.target.value);
+                          newItems[index].unit_cost = cost;
+                          newItems[index].total_cost = cost * newItems[index].entered_quantity;
+                          setFormData({...formData, items: newItems});
+                        }}
+                        className="bg-slate-800 border-none rounded-lg px-3 py-2 text-white w-24"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm text-slate-400 font-bold">{format(item.total_cost || 0)}</span>
                     </td>
                     <td className="px-4 py-3">
                       <button type="button" onClick={() => {

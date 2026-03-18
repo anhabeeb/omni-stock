@@ -8,7 +8,7 @@ import {
   useLocation, 
   useNavigate 
 } from "react-router-dom";
-import { useQuery, useQueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useQuery, useQueryClient, QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 import UsersPage from "./components/Admin/UsersPage";
 import SettingsPage from "./components/Admin/SettingsPage";
@@ -748,8 +748,16 @@ function AppContent() {
   );
 }
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
 export default function App() {
-  const queryClient = useQueryClient();
   return (
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>

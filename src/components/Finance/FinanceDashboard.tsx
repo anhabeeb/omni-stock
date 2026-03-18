@@ -61,7 +61,7 @@ export default function FinanceDashboard() {
 
   const loading = summaryLoading || marginsLoading || trendLoading;
 
-  const StatCard = ({ icon: Icon, label, value, subValue, color, trend }: any) => (
+  const StatCard = ({ icon: Icon, label, value, subValue, color, trend, isPercentage }: any) => (
     <motion.div 
       whileHover={{ y: -5 }}
       className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4 relative overflow-hidden group"
@@ -80,7 +80,9 @@ export default function FinanceDashboard() {
       </div>
       <div>
         <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">{label}</p>
-        <h3 className="text-2xl font-bold text-white tracking-tight">{format(value)}</h3>
+        <h3 className="text-2xl font-bold text-white tracking-tight">
+          {isPercentage ? value : format(value)}
+        </h3>
         {subValue && <p className="text-xs text-slate-400 mt-1 font-medium">{subValue}</p>}
       </div>
     </motion.div>
@@ -119,11 +121,11 @@ export default function FinanceDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard icon={Wallet} label="Total Revenue" value={`$${summary?.revenue?.toLocaleString() || 0}`} color="emerald" trend={12} />
-        <StatCard icon={ArrowUpRight} label="COGS" value={`$${summary?.cogs?.toLocaleString() || 0}`} subValue="Inventory Issued" color="orange" trend={-5} />
-        <StatCard icon={TrendingDown} label="Wastage Loss" value={`$${summary?.wastageLoss?.toLocaleString() || 0}`} color="rose" />
-        <StatCard icon={Target} label="Net Profit" value={`$${summary?.netProfit?.toLocaleString() || 0}`} subValue="After Wastage" color="blue" trend={8} />
-        <StatCard icon={Percent} label="Margin %" value={`${summary?.marginPercentage?.toFixed(1) || 0}%`} color="violet" trend={2} />
+        <StatCard icon={Wallet} label="Total Revenue" value={summary?.revenue || 0} color="emerald" trend={12} />
+        <StatCard icon={ArrowUpRight} label="COGS" value={summary?.cogs || 0} subValue="Inventory Issued" color="orange" trend={-5} />
+        <StatCard icon={TrendingDown} label="Wastage Loss" value={summary?.wastageLoss || 0} color="rose" />
+        <StatCard icon={Target} label="Net Profit" value={summary?.netProfit || 0} subValue="After Wastage" color="blue" trend={8} />
+        <StatCard icon={Percent} label="Margin %" value={`${summary?.marginPercentage?.toFixed(1) || 0}%`} color="violet" trend={2} isPercentage />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

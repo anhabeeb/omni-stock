@@ -58,7 +58,7 @@ export default function AnalyticsDashboard() {
     fetchData();
   }, [filters.godownId]); // Refresh on godown change
 
-  const StatCard = ({ icon: Icon, label, value, subValue, color }: any) => (
+  const StatCard = ({ icon: Icon, label, value, subValue, color, isCurrency }: any) => (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -72,7 +72,7 @@ export default function AnalyticsDashboard() {
       </div>
       <p className="text-slate-400 text-sm font-medium">{label}</p>
       <div className="flex items-baseline gap-2 mt-1">
-        <h3 className="text-2xl font-bold text-white">{label.toLowerCase().includes('value') ? format(value) : value}</h3>
+        <h3 className="text-2xl font-bold text-white">{isCurrency ? format(value) : value}</h3>
         {subValue && <span className="text-xs text-slate-500">{subValue}</span>}
       </div>
     </motion.div>
@@ -111,27 +111,29 @@ export default function AnalyticsDashboard() {
         <StatCard 
           icon={DollarSign} 
           label="Total Stock Value" 
-          value={`$${summary?.totalValue?.toLocaleString()}`} 
+          value={summary?.totalValue || 0} 
           color="emerald" 
+          isCurrency
         />
         <StatCard 
           icon={Package} 
           label="Total Quantity" 
-          value={summary?.totalQuantity?.toLocaleString()} 
+          value={summary?.totalQuantity?.toLocaleString() || 0} 
           color="blue" 
         />
         <StatCard 
           icon={AlertTriangle} 
           label="Low Stock Items" 
-          value={summary?.lowStockCount} 
+          value={summary?.lowStockCount || 0} 
           subValue="Requires Reorder"
           color="amber" 
         />
         <StatCard 
           icon={Trash2} 
           label="Wastage (Period)" 
-          value={`$${summary?.wastageValue?.toLocaleString()}`} 
+          value={summary?.wastageValue || 0} 
           color="rose" 
+          isCurrency
         />
       </div>
 

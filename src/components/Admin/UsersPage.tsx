@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TableSkeleton } from '../Common/LoadingSkeleton';
+import { cn } from '../../utils/cn';
 
 interface User {
   id: string;
@@ -341,8 +342,4 @@ export default function UsersPage() {
       </AnimatePresence>
     </div>
   );
-}
-
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(' ');
 }

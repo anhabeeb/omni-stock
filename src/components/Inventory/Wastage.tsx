@@ -8,9 +8,11 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AttachmentManager } from '../Common/AttachmentManager';
+import { useSettings } from '../../contexts/SettingsContext';
 
 export default function Wastage() {
   const queryClient = useQueryClient();
+  const { format } = useSettings();
   const [activeRecordId, setActiveRecordId] = useState<string | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const [newRecord, setNewRecord] = useState({
@@ -430,7 +432,7 @@ export default function Wastage() {
                       />
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-rose-400 font-bold text-sm">${item.total_cost?.toLocaleString()}</span>
+                      <span className="text-rose-400 font-bold text-sm">{format(item.total_cost || 0)}</span>
                       <button onClick={() => handleRemoveItem(i)} className="p-1.5 hover:bg-rose-500/10 text-rose-500 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
                         <Trash size={16} />
                       </button>
