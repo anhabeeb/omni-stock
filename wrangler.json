@@ -2,6 +2,12 @@
   "name": "omni-stock",
   "main": "worker/index.ts",
   "compatibility_date": "2024-04-03",
+
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+
   "d1_databases": [
     {
       "binding": "DB",
@@ -10,18 +16,21 @@
       "migrations_dir": "migrations"
     }
   ],
+
   "r2_buckets": [
     {
       "binding": "BUCKET",
       "bucket_name": "omni-stock"
     }
   ],
+
   "kv_namespaces": [
     {
       "binding": "KV",
       "id": "5a348d7010e34e04a772c6df645228b4"
     }
   ],
+
   "observability": {
     "enabled": true
   }
