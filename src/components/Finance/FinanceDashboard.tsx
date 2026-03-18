@@ -1,50 +1,63 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, AreaChart, Area
+  AreaChart, Area
 } from 'recharts';
 import { 
-  DollarSign, TrendingUp, TrendingDown, Clock, 
-  Filter, RefreshCw, ArrowUpRight, ArrowDownLeft,
-  BarChart3, PieChart as PieChartIcon, LayoutDashboard,
-  Target, Percent, Wallet, Building2, AlertCircle
+  TrendingUp, TrendingDown, 
+  RefreshCw, ArrowUpRight,
+  Building2, Wallet, Target, Percent, AlertCircle
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { FinanceSummary } from '../../types';
-
-const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+import { useQuery } from '@tanstack/react-query';
 
 export default function FinanceDashboard() {
-  const [summary, setSummary] = useState<FinanceSummary | null>(null);
-  const [outletMargins, setOutletMargins] = useState<any[]>([]);
-  const [salesTrend, setSalesTrend] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     to: new Date().toISOString().split('T')[0]
   });
 
-  const fetchData = async () => {
-    setLoading(true);
-    const token = localStorage.getItem('token');
-    const headers = { Authorization: `Bearer ${token}` };
-    
-    const [summaryRes, marginsRes, trendRes] = await Promise.all([
-      fetch(`/api/finance/summary?from=${filters.from}&to=${filters.to}`, { headers }),
-      fetch(`/api/finance/margin/by-outlet?from=${filters.from}&to=${filters.to}`, { headers }),
-      fetch(`/api/finance/sales-trend?from=${filters.from}&to=${filters.to}`, { headers })
-    ]);
+  const token = localStorage.getItem('token');
+  const headers = { Authorization: `Bearer ${token}` };
 
-    if (summaryRes.ok) setSummary(await summaryRes.json());
-    if (marginsRes.ok) setOutletMargins(await marginsRes.json());
-    if (trendRes.ok) setSalesTrend(await trendRes.json());
-    
-    setLoading(false);
+  const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useQuery<FinanceSummary>({
+    queryKey: ['finance', 'summary', filters],
+    queryFn: async () => {
+      const res = await fetch(`/api/finance/summary?from=${filters.from}&to=${filters.to}`, { headers });
+      if (!res.ok) throw new Error('Failed to fetch finance summary');
+      return res.json();
+    },
+    staleTime: 60000,
+  });
+
+  const { data: outletMargins = [], isLoading: marginsLoading, refetch: refetchMargins } = useQuery<any[]>({
+    queryKey: ['finance', 'margins', filters],
+    queryFn: async () => {
+      const res = await fetch(`/api/finance/margin/by-outlet?from=${filters.from}&to=${filters.to}`, { headers });
+      if (!res.ok) throw new Error('Failed to fetch outlet margins');
+      return res.json();
+    },
+    staleTime: 120000,
+  });
+
+  const { data: salesTrend = [], isLoading: trendLoading, refetch: refetchTrend } = useQuery<any[]>({
+    queryKey: ['finance', 'sales-trend', filters],
+    queryFn: async () => {
+      const res = await fetch(`/api/finance/sales-trend?from=${filters.from}&to=${filters.to}`, { headers });
+      if (!res.ok) throw new Error('Failed to fetch sales trend');
+      return res.json();
+    },
+    staleTime: 120000,
+  });
+
+  const handleRefresh = () => {
+    refetchSummary();
+    refetchMargins();
+    refetchTrend();
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [filters]);
+  const loading = summaryLoading || marginsLoading || trendLoading;
 
   const StatCard = ({ icon: Icon, label, value, subValue, color, trend }: any) => (
     <motion.div 
@@ -95,7 +108,7 @@ export default function FinanceDashboard() {
             />
           </div>
           <button 
-            onClick={fetchData}
+            onClick={handleRefresh}
             className="p-3 bg-slate-900 rounded-2xl border border-slate-800 text-slate-400 hover:text-white transition-all"
           >
             <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
@@ -104,11 +117,11 @@ export default function FinanceDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard icon={Wallet} label="Total Revenue" value={`$${summary?.revenue?.toLocaleString()}`} color="emerald" trend={12} />
-        <StatCard icon={ArrowUpRight} label="COGS" value={`$${summary?.cogs?.toLocaleString()}`} subValue="Inventory Issued" color="orange" trend={-5} />
-        <StatCard icon={TrendingDown} label="Wastage Loss" value={`$${summary?.wastageLoss?.toLocaleString()}`} color="rose" />
-        <StatCard icon={Target} label="Net Profit" value={`$${summary?.netProfit?.toLocaleString()}`} subValue="After Wastage" color="blue" trend={8} />
-        <StatCard icon={Percent} label="Margin %" value={`${summary?.marginPercentage?.toFixed(1)}%`} color="violet" trend={2} />
+        <StatCard icon={Wallet} label="Total Revenue" value={`$${summary?.revenue?.toLocaleString() || 0}`} color="emerald" trend={12} />
+        <StatCard icon={ArrowUpRight} label="COGS" value={`$${summary?.cogs?.toLocaleString() || 0}`} subValue="Inventory Issued" color="orange" trend={-5} />
+        <StatCard icon={TrendingDown} label="Wastage Loss" value={`$${summary?.wastageLoss?.toLocaleString() || 0}`} color="rose" />
+        <StatCard icon={Target} label="Net Profit" value={`$${summary?.netProfit?.toLocaleString() || 0}`} subValue="After Wastage" color="blue" trend={8} />
+        <StatCard icon={Percent} label="Margin %" value={`${summary?.marginPercentage?.toFixed(1) || 0}%`} color="violet" trend={2} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -187,7 +200,7 @@ export default function FinanceDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {outletMargins.map((row, idx) => (
+              {outletMargins.map((row: any, idx: number) => (
                 <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
                   <td className="px-6 py-4">
                     <p className="text-sm font-bold text-white">{row.outletName}</p>

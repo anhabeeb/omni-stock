@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   ClipboardList, Plus, Search, Filter, 
   ChevronRight, CheckCircle2, XCircle, 
@@ -10,136 +11,157 @@ import BarcodeScanModal from '../Common/BarcodeScanModal';
 import { AttachmentManager } from '../Common/AttachmentManager';
 
 export default function StockCount() {
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [activeSession, setActiveSession] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [godowns, setGodowns] = useState<any[]>([]);
+  const queryClient = useQueryClient();
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const [newSession, setNewSession] = useState({ godown_id: '', remarks: '' });
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchSessions = async () => {
-    setLoading(true);
-    const token = localStorage.getItem('token');
-    const res = await fetch('/api/stock-counts', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    setSessions(await res.json());
-    setLoading(false);
-  };
+  const { data: sessions = [], isLoading: sessionsLoading } = useQuery<any[]>({
+    queryKey: ["stock-counts"],
+    queryFn: async () => {
+      const res = await fetch('/api/stock-counts', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      return res.json();
+    }
+  });
 
-  const fetchGodowns = async () => {
-    const res = await fetch('/api/godowns', {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    });
-    setGodowns(await res.json());
-  };
+  const { data: godowns = [] } = useQuery<any[]>({
+    queryKey: ["master-data", "godowns"],
+    queryFn: async () => {
+      const res = await fetch('/api/godowns', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 10,
+  });
 
-  useEffect(() => {
-    fetchSessions();
-    fetchGodowns();
-  }, []);
+  const { data: activeSession, isLoading: sessionLoading } = useQuery<any>({
+    queryKey: ["stock-counts", activeSessionId],
+    queryFn: async () => {
+      const res = await fetch(`/api/stock-counts/${activeSessionId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      return res.json();
+    },
+    enabled: !!activeSessionId,
+  });
 
-  const handleCreateSession = async () => {
-    if (!newSession.godown_id) return alert("Please select a godown");
-    const res = await fetch('/api/stock-counts', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify(newSession)
-    });
-    if (res.ok) {
-      const data = await res.json() as any;
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch('/api/stock-counts', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(data)
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["stock-counts"] });
       setShowNewModal(false);
-      fetchSessions();
-      handleViewSession(data.id);
+      setActiveSessionId(data.id);
     }
-  };
+  });
 
-  const handleViewSession = async (id: string) => {
-    const res = await fetch(`/api/stock-counts/${id}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    });
-    setActiveSession(await res.json());
-  };
-
-  const handleLoadStock = async () => {
-    if (!activeSession) return;
-    const res = await fetch(`/api/stock-counts/${activeSession.id}/load-system-stock`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    });
-    if (res.ok) handleViewSession(activeSession.id);
-  };
-
-  const handleUpdateCount = async (itemId: string, qty: number) => {
-    await fetch(`/api/stock-counts/items/${itemId}`, {
-      method: 'PUT',
-      headers: { 
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify({ counted_quantity: qty })
-    });
-    // Optimistic update or silent refresh
-  };
-
-  const handleSubmit = async () => {
-    if (!activeSession) return;
-    await fetch(`/api/stock-counts/${activeSession.id}/submit`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    });
-    handleViewSession(activeSession.id);
-  };
-
-  const handleApprove = async () => {
-    if (!activeSession) return;
-    await fetch(`/api/stock-counts/${activeSession.id}/approve`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    });
-    handleViewSession(activeSession.id);
-  };
-
-  const handlePost = async () => {
-    if (!activeSession) return;
-    const res = await fetch(`/api/stock-counts/${activeSession.id}/post`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    });
-    if (res.ok) handleViewSession(activeSession.id);
-    else {
-      const data = await res.json() as any;
-      alert(data.message);
+  const loadStockMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await fetch(`/api/stock-counts/${id}/load-system-stock`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock-counts", activeSessionId] });
     }
-  };
+  });
+
+  const updateCountMutation = useMutation({
+    mutationFn: async ({ itemId, qty }: { itemId: string, qty: number }) => {
+      await fetch(`/api/stock-counts/items/${itemId}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ counted_quantity: qty })
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock-counts", activeSessionId] });
+    }
+  });
+
+  const submitMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await fetch(`/api/stock-counts/${id}/submit`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock-counts", activeSessionId] });
+    }
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await fetch(`/api/stock-counts/${id}/approve`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock-counts", activeSessionId] });
+    }
+  });
+
+  const postMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/stock-counts/${id}/post`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!res.ok) {
+        const data = await res.json() as any;
+        throw new Error(data.message);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock-counts", activeSessionId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["stock"] });
+    },
+    onError: (error: any) => {
+      alert(error.message);
+    }
+  });
 
   const handleBarcodeScan = async (code: string) => {
     if (!activeSession) return;
-    // Try to find item in the current session list
     const item = activeSession.items.find((i: any) => i.item_sku === code || i.barcode === code);
     if (item) {
       setSearchQuery(item.item_sku);
-      // Scroll to item or highlight it
       const element = document.getElementById(`item-${item.id}`);
       if (element) element.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else {
-      // If not in list, maybe it's a new item for this godown?
-      // For now, just alert
       alert("Item not found in this count session. Ensure it has stock in this godown.");
     }
   };
 
-  if (activeSession) {
+  if (activeSessionId && activeSession) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={() => { setActiveSession(null); fetchSessions(); }} className="p-2 hover:bg-slate-800 rounded-xl text-slate-400">
+            <button onClick={() => { setActiveSessionId(null); queryClient.invalidateQueries({ queryKey: ["stock-counts"] }); }} className="p-2 hover:bg-slate-800 rounded-xl text-slate-400">
               <ChevronRight className="rotate-180" size={24} />
             </button>
             <div>
@@ -157,26 +179,42 @@ export default function StockCount() {
                   <Scan size={18} />
                   <span>Scan Item</span>
                 </button>
-                <button onClick={handleLoadStock} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl border border-slate-700 transition-colors flex items-center gap-2">
-                  <RefreshCw size={18} />
-                  <span>Load System Stock</span>
+                <button 
+                  onClick={() => loadStockMutation.mutate(activeSession.id)} 
+                  disabled={loadStockMutation.isPending}
+                  className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl border border-slate-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                >
+                  <RefreshCw size={18} className={loadStockMutation.isPending ? "animate-spin" : ""} />
+                  <span>{loadStockMutation.isPending ? "Loading..." : "Load System Stock"}</span>
                 </button>
-                <button onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2">
+                <button 
+                  onClick={() => submitMutation.mutate(activeSession.id)} 
+                  disabled={submitMutation.isPending}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                >
                   <Send size={18} />
-                  <span>Submit for Approval</span>
+                  <span>{submitMutation.isPending ? "Submitting..." : "Submit for Approval"}</span>
                 </button>
               </>
             )}
             {activeSession.status === 'submitted' && (
-              <button onClick={handleApprove} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2">
+              <button 
+                onClick={() => approveMutation.mutate(activeSession.id)} 
+                disabled={approveMutation.isPending}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 disabled:opacity-50"
+              >
                 <Check size={18} />
-                <span>Approve Session</span>
+                <span>{approveMutation.isPending ? "Approving..." : "Approve Session"}</span>
               </button>
             )}
             {activeSession.status === 'approved' && (
-              <button onClick={handlePost} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2">
+              <button 
+                onClick={() => postMutation.mutate(activeSession.id)} 
+                disabled={postMutation.isPending}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 disabled:opacity-50"
+              >
                 <Save size={18} />
-                <span>Post Reconciliation</span>
+                <span>{postMutation.isPending ? "Posting..." : "Post Reconciliation"}</span>
               </button>
             )}
             <span className={`px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${
@@ -232,7 +270,7 @@ export default function StockCount() {
                       type="number"
                       defaultValue={item.counted_quantity}
                       disabled={activeSession.status !== 'draft' && activeSession.status !== 'in_progress'}
-                      onBlur={(e) => handleUpdateCount(item.id, parseFloat(e.target.value))}
+                      onBlur={(e) => updateCountMutation.mutate({ itemId: item.id, qty: parseFloat(e.target.value) })}
                       className="w-24 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-right text-sm text-white outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
                     />
                   </td>
@@ -290,10 +328,10 @@ export default function StockCount() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {loading ? (
+              {sessionsLoading ? (
                 [1,2,3].map(i => <tr key={i} className="animate-pulse"><td colSpan={6} className="px-6 py-8"><div className="h-4 bg-slate-800 rounded w-full" /></td></tr>)
-              ) : sessions.map((s, i) => (
-                <tr key={i} className="hover:bg-slate-800/30 transition-colors group cursor-pointer" onClick={() => handleViewSession(s.id)}>
+              ) : sessions.map((s: any, i: number) => (
+                <tr key={i} className="hover:bg-slate-800/30 transition-colors group cursor-pointer" onClick={() => setActiveSessionId(s.id)}>
                   <td className="px-6 py-4 text-sm text-white font-bold">{s.session_number}</td>
                   <td className="px-6 py-4 text-sm text-slate-300">{s.godown_name}</td>
                   <td className="px-6 py-4 text-sm text-slate-400">{new Date(s.count_date).toLocaleDateString()}</td>
@@ -338,7 +376,7 @@ export default function StockCount() {
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     <option value="">Select Godown...</option>
-                    {godowns.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    {godowns.map((g: any) => <option key={g.id} value={g.id}>{g.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -352,7 +390,13 @@ export default function StockCount() {
                 </div>
                 <div className="flex gap-3 pt-4">
                   <button onClick={() => setShowNewModal(false)} className="flex-1 px-4 py-3 rounded-xl border border-slate-700 text-slate-400 font-bold hover:bg-slate-800 transition-colors">Cancel</button>
-                  <button onClick={handleCreateSession} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-600/20 transition-all">Start Session</button>
+                  <button 
+                    onClick={() => createMutation.mutate(newSession)} 
+                    disabled={createMutation.isPending}
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50"
+                  >
+                    {createMutation.isPending ? "Starting..." : "Start Session"}
+                  </button>
                 </div>
               </div>
             </motion.div>

@@ -1,30 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Search, Package, Warehouse, AlertTriangle, Clock } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 
 const CurrentStock: React.FC = () => {
-  const [stock, setStock] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    fetchStock();
-  }, []);
-
-  const fetchStock = async () => {
-    try {
+  const { data: stock = [], isLoading } = useQuery<any[]>({
+    queryKey: ['inventory', 'current-stock-summary'],
+    queryFn: async () => {
       const response = await fetch('/api/stock/current', {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
-      const data = await response.json();
-      setStock(data);
-    } catch (error) {
-      console.error('Error fetching stock:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (!response.ok) throw new Error('Failed to fetch stock');
+      return response.json();
+    },
+    staleTime: 60000, // 60 seconds
+  });
 
-  const filtered = stock.filter(s => 
+  const filtered = stock.filter((s: any) => 
     s.item_name?.toLowerCase().includes(search.toLowerCase()) ||
     s.item_sku?.toLowerCase().includes(search.toLowerCase()) ||
     s.godown_name?.toLowerCase().includes(search.toLowerCase())
@@ -65,7 +58,7 @@ const CurrentStock: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {loading ? (
+              {isLoading ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-slate-500">Loading stock data...</td>
                 </tr>
@@ -73,7 +66,7 @@ const CurrentStock: React.FC = () => {
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-slate-500">No stock found</td>
                 </tr>
-              ) : filtered.map((s, i) => (
+              ) : filtered.map((s: any, i: number) => (
                 <tr key={i} className="hover:bg-slate-800/30 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">

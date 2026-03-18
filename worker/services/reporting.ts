@@ -142,23 +142,27 @@ export class ReportingService {
     return results;
   }
 
-  async getFastMoving(limit = 10) {
+  async getFastMoving(limit = 10, offset = 0) {
     const { results } = await this.db.prepare(`
-      SELECT i.name, SUM(m.base_quantity) as total_issued
+      SELECT i.id, i.name, i.sku, SUM(m.base_quantity) as total_issued
       FROM stock_movements m
       JOIN items i ON m.item_id = i.id
       WHERE m.movement_type = 'issue_to_outlet'
       AND m.movement_date >= ?
       GROUP BY i.id
       ORDER BY total_issued DESC
-      LIMIT ?
-    `).bind(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), limit).all();
+      LIMIT ? OFFSET ?
+    `).bind(
+      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), 
+      limit, 
+      offset
+    ).all();
     return results;
   }
 
-  async getDeadStock(days = 90) {
+  async getDeadStock(days = 90, limit = 50, offset = 0) {
     const { results } = await this.db.prepare(`
-      SELECT i.name, s.quantity_on_hand, s.average_unit_cost
+      SELECT i.id, i.name, i.sku, SUM(s.quantity_on_hand) as quantity_on_hand, AVG(s.average_unit_cost) as average_unit_cost
       FROM inventory_balance_summary s
       JOIN items i ON s.item_id = i.id
       WHERE s.quantity_on_hand > 0
@@ -166,23 +170,30 @@ export class ReportingService {
         SELECT 1 FROM stock_movements m
         WHERE m.item_id = i.id AND m.movement_date >= ?
       )
-    `).bind(new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()).all();
+      GROUP BY i.id
+      ORDER BY quantity_on_hand DESC
+      LIMIT ? OFFSET ?
+    `).bind(
+      new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString(),
+      limit,
+      offset
+    ).all();
     return results;
   }
 
-  async getValuationReport(groupBy: 'godown' | 'category' | 'item' = 'item') {
+  async getValuationReport(groupBy: 'godown' | 'category' | 'item' = 'item', limit = 50, offset = 0) {
     let sql = "";
     if (groupBy === 'godown') {
-      sql = `SELECT g.name as group_name, SUM(s.quantity_on_hand * IFNULL(s.average_unit_cost, 0)) as total_value 
-             FROM inventory_balance_summary s JOIN godowns g ON s.godown_id = g.id GROUP BY g.id`;
+      sql = `SELECT g.id, g.name as group_name, SUM(s.quantity_on_hand * IFNULL(s.average_unit_cost, 0)) as total_value 
+             FROM inventory_balance_summary s JOIN godowns g ON s.godown_id = g.id GROUP BY g.id ORDER BY total_value DESC LIMIT ? OFFSET ?`;
     } else if (groupBy === 'category') {
-      sql = `SELECT c.name as group_name, SUM(s.quantity_on_hand * IFNULL(s.average_unit_cost, 0)) as total_value 
-             FROM inventory_balance_summary s JOIN items i ON s.item_id = i.id JOIN categories c ON i.category_id = c.id GROUP BY c.id`;
+      sql = `SELECT c.id, c.name as group_name, SUM(s.quantity_on_hand * IFNULL(s.average_unit_cost, 0)) as total_value 
+             FROM inventory_balance_summary s JOIN items i ON s.item_id = i.id JOIN categories c ON i.category_id = c.id GROUP BY c.id ORDER BY total_value DESC LIMIT ? OFFSET ?`;
     } else {
-      sql = `SELECT i.name as group_name, i.sku, SUM(s.quantity_on_hand * IFNULL(s.average_unit_cost, 0)) as total_value 
-             FROM inventory_balance_summary s JOIN items i ON s.item_id = i.id GROUP BY i.id`;
+      sql = `SELECT i.id, i.name as group_name, i.sku, SUM(s.quantity_on_hand * IFNULL(s.average_unit_cost, 0)) as total_value 
+             FROM inventory_balance_summary s JOIN items i ON s.item_id = i.id GROUP BY i.id ORDER BY total_value DESC LIMIT ? OFFSET ?`;
     }
-    const { results } = await this.db.prepare(sql).all();
+    const { results } = await this.db.prepare(sql).bind(limit, offset).all();
     return results;
   }
 }

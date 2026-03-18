@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { 
   TrendingUp, 
   AlertTriangle, 
   Package, 
   Clock, 
-  ArrowRight,
   BarChart3,
-  PieChart as PieChartIcon,
   Activity
 } from 'lucide-react';
 import { 
@@ -17,12 +15,9 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer, 
-  Cell,
-  LineChart,
-  Line,
-  AreaChart,
-  Area
+  Cell
 } from 'recharts';
+import { useQuery } from '@tanstack/react-query';
 
 interface KPISummary {
   totalInventoryValue: number;
@@ -39,31 +34,32 @@ interface TurnoverData {
 }
 
 export const KPIDashboard: React.FC = () => {
-  const [summary, setSummary] = useState<KPISummary | null>(null);
-  const [turnover, setTurnover] = useState<TurnoverData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useQuery<KPISummary>({
+    queryKey: ['kpi', 'summary'],
+    queryFn: async () => {
+      const res = await fetch('/api/kpi/summary');
+      if (!res.ok) throw new Error('Failed to fetch KPI summary');
+      return res.json();
+    },
+    staleTime: 60000, // 60 seconds
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const { data: turnover, isLoading: turnoverLoading, refetch: refetchTurnover } = useQuery<TurnoverData>({
+    queryKey: ['kpi', 'turnover'],
+    queryFn: async () => {
+      const res = await fetch('/api/kpi/turnover');
+      if (!res.ok) throw new Error('Failed to fetch turnover data');
+      return res.json();
+    },
+    staleTime: 120000, // 120 seconds
+  });
 
-  const fetchData = async () => {
-    try {
-      const [summaryRes, turnoverRes] = await Promise.all([
-        fetch('/api/kpi/summary'),
-        fetch('/api/kpi/turnover')
-      ]);
-      
-      if (summaryRes.ok) setSummary(await summaryRes.json());
-      if (turnoverRes.ok) setTurnover(await turnoverRes.json());
-    } catch (error) {
-      console.error('Error fetching KPI data:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleRefresh = () => {
+    refetchSummary();
+    refetchTurnover();
   };
 
-  if (loading) return <div className="p-8 text-center">Loading Intelligence Dashboard...</div>;
+  if (summaryLoading || turnoverLoading) return <div className="p-8 text-center">Loading Intelligence Dashboard...</div>;
 
   const stats = [
     {
@@ -101,7 +97,7 @@ export const KPIDashboard: React.FC = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Warehouse Intelligence</h1>
         <button 
-          onClick={fetchData}
+          onClick={handleRefresh}
           className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium"
         >
           <Activity className="w-4 h-4" />

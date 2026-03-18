@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate } from "react-router-dom";
+import { 
+  BrowserRouter as Router, 
+  Routes, 
+  Route, 
+  Navigate, 
+  Link, 
+  useLocation, 
+  useNavigate 
+} from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   LayoutDashboard, 
   Package, 
@@ -386,30 +395,50 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User, token: string) => void }
 };
 
 const DashboardPage = () => {
-  const [stats, setStats] = useState<any>(null);
-  const [recentMovements, setRecentMovements] = useState<any[]>([]);
-
-  useEffect(() => {
-    const fetchData = async () => {
+  const { data: stats, isLoading: statsLoading } = useQuery<{
+    totalStockValue: number;
+    totalItems: number;
+    lowStockCount: number;
+    nearExpiryCount: number;
+  }>({
+    queryKey: ["dashboard-summary"],
+    queryFn: async () => {
       const token = localStorage.getItem("token");
-      const [sRes, mRes] = await Promise.all([
-        fetch("/api/dashboard/summary", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/inventory/movements", { headers: { Authorization: `Bearer ${token}` } })
-      ]);
-      const sData = await sRes.json() as any;
-      const mData = await mRes.json() as any;
-      setStats(sData);
-      setRecentMovements(mData.slice(0, 5));
-    };
-    fetchData();
-  }, []);
+      const res = await fetch("/api/dashboard/summary", { 
+        headers: { Authorization: `Bearer ${token}` } 
+      });
+      if (!res.ok) throw new Error("Failed to fetch dashboard summary");
+      return res.json();
+    },
+    staleTime: 30000, // 30 seconds as per worker cache
+  });
 
-  if (!stats) return <div className="animate-pulse space-y-4">
-    <div className="h-32 bg-slate-900 rounded-3xl w-full" />
-    <div className="grid grid-cols-4 gap-6">
-      {[1,2,3,4].map(i => <div key={i} className="h-24 bg-slate-900 rounded-2xl" />)}
+  const { data: recentMovements = [], isLoading: movementsLoading } = useQuery<any[]>({
+    queryKey: ["recent-movements"],
+    queryFn: async () => {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/inventory/movements", { 
+        headers: { Authorization: `Bearer ${token}` } 
+      });
+      if (!res.ok) throw new Error("Failed to fetch movements");
+      const data = await res.json();
+      return Array.isArray(data) ? data.slice(0, 5) : [];
+    },
+    staleTime: 60000, // 60 seconds
+  });
+
+  if (statsLoading || movementsLoading) return (
+    <div className="animate-pulse space-y-8">
+      <div className="h-12 bg-slate-900 rounded-xl w-1/3" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[1,2,3,4].map(i => <div key={i} className="h-32 bg-slate-900 rounded-3xl" />)}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 h-96 bg-slate-900 rounded-3xl" />
+        <div className="h-96 bg-slate-900 rounded-3xl" />
+      </div>
     </div>
-  </div>;
+  );
 
   return (
     <div className="space-y-8">
@@ -433,10 +462,10 @@ const DashboardPage = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard icon={DollarSign} label="Stock Value" value={`$${(stats.totalStockValue || 0).toLocaleString()}`} color="emerald" />
-        <StatCard icon={Package} label="Total Items" value={stats.totalItems} color="blue" />
-        <StatCard icon={AlertTriangle} label="Low Stock" value={stats.lowStockCount} color="amber" />
-        <StatCard icon={Clock} label="Near Expiry" value={stats.nearExpiryCount} color="rose" />
+        <StatCard icon={DollarSign} label="Stock Value" value={`$${(stats?.totalStockValue || 0).toLocaleString()}`} color="emerald" />
+        <StatCard icon={Package} label="Total Items" value={stats?.totalItems || 0} color="blue" />
+        <StatCard icon={AlertTriangle} label="Low Stock" value={stats?.lowStockCount || 0} color="amber" />
+        <StatCard icon={Clock} label="Near Expiry" value={stats?.nearExpiryCount || 0} color="rose" />
       </div>
 
       {/* Main Grid */}
@@ -519,17 +548,17 @@ const StatCard = ({ icon: Icon, label, value, color }: { icon: any, label: strin
 };
 
 const MasterListPage = ({ title, endpoint, columns }: { title: string, endpoint: string, columns: any[] }) => {
-  const [data, setData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(`/api/${endpoint}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-    })
-    .then(res => res.json())
-    .then(setData)
-    .finally(() => setLoading(false));
-  }, [endpoint]);
+  const { data = [], isLoading } = useQuery<any[]>({
+    queryKey: ["master-data", endpoint],
+    queryFn: async () => {
+      const res = await fetch(`/api/${endpoint}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      if (!res.ok) throw new Error(`Failed to fetch ${endpoint}`);
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 10, // 10 minutes as per worker cache
+  });
 
   return (
     <div className="space-y-6">
@@ -569,7 +598,7 @@ const MasterListPage = ({ title, endpoint, columns }: { title: string, endpoint:
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {loading ? (
+              {isLoading ? (
                 [1,2,3,4,5].map(i => (
                   <tr key={i} className="animate-pulse">
                     {columns.map(col => (
@@ -578,7 +607,7 @@ const MasterListPage = ({ title, endpoint, columns }: { title: string, endpoint:
                     <td className="px-6 py-4"><div className="h-4 bg-slate-800 rounded w-8 ml-auto" /></td>
                   </tr>
                 ))
-              ) : data.map((item, i) => (
+              ) : data.map((item: any, i: number) => (
                 <tr key={i} className="hover:bg-slate-800/30 transition-colors group">
                   {columns.map(col => (
                     <td key={col.key} className="px-6 py-4 text-sm text-slate-300">

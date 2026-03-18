@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Plus, Search, Filter, MoreVertical, AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import { motion } from "motion/react";
+import { useQuery } from "@tanstack/react-query";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -19,27 +20,19 @@ interface StockAdjustment {
 }
 
 export default function StockAdjustmentList() {
-  const [adjustments, setAdjustments] = useState<StockAdjustment[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    fetchAdjustments();
-  }, []);
-
-  const fetchAdjustments = async () => {
-    try {
+  const { data: adjustments = [], isLoading: loading } = useQuery<StockAdjustment[]>({
+    queryKey: ['adjustments'],
+    queryFn: async () => {
       const res = await fetch("/api/adjustments", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
-      const data = await res.json();
-      setAdjustments(data);
-    } catch (err) {
-      console.error("Failed to fetch adjustments", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (!res.ok) throw new Error('Failed to fetch adjustments');
+      return res.json();
+    },
+    staleTime: 30000,
+  });
 
   const getStatusBadge = (status: string) => {
     switch (status) {

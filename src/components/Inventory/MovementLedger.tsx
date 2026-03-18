@@ -1,24 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Filter, ArrowUpRight, ArrowDownLeft, RefreshCw, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, ArrowUpRight, ArrowDownLeft, RefreshCw, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useQuery } from '@tanstack/react-query';
 
 const MovementLedger: React.FC = () => {
-  const [movements, setMovements] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetch('/api/inventory/movements', {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-    })
-    .then(res => res.json())
-    .then(data => {
-      setMovements(data);
-      setLoading(false);
-    });
-  }, []);
+  const { data: movements = [], isLoading } = useQuery<any[]>({
+    queryKey: ['inventory', 'movements'],
+    queryFn: async () => {
+      const res = await fetch('/api/inventory/movements', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch movements');
+      return res.json();
+    },
+    staleTime: 60000, // 60 seconds
+  });
 
-  const filteredMovements = movements.filter(m => 
+  const filteredMovements = movements.filter((m: any) => 
     m.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.reference_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     m.movement_type?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -71,11 +71,11 @@ const MovementLedger: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
-            {loading ? (
+            {isLoading ? (
               <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-500">Loading audit trail...</td></tr>
             ) : filteredMovements.length === 0 ? (
               <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-500">No movements found.</td></tr>
-            ) : filteredMovements.map((m, idx) => (
+            ) : filteredMovements.map((m: any, idx: number) => (
               <motion.tr 
                 key={idx}
                 initial={{ opacity: 0 }}

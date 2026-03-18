@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Plus, Search, Filter, MoreVertical, AlertCircle, CheckCircle2, Clock, Truck, ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
+import { useQuery } from "@tanstack/react-query";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -19,27 +20,19 @@ interface Transfer {
 }
 
 export default function TransferList() {
-  const [transfers, setTransfers] = useState<Transfer[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    fetchTransfers();
-  }, []);
-
-  const fetchTransfers = async () => {
-    try {
+  const { data: transfers = [], isLoading: loading } = useQuery<any[]>({
+    queryKey: ['transfers'],
+    queryFn: async () => {
       const res = await fetch("/api/transfers", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
       });
-      const data = await res.json();
-      setTransfers(data);
-    } catch (err) {
-      console.error("Failed to fetch transfers", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (!res.ok) throw new Error('Failed to fetch transfers');
+      return res.json();
+    },
+    staleTime: 30000,
+  });
 
   const getStatusBadge = (status: string) => {
     switch (status) {

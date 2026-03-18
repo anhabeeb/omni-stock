@@ -13,7 +13,13 @@
   "r2_buckets": [
     {
       "binding": "BUCKET",
-      "bucket_name": "inventory-attachments"
+      "bucket_name": "omni-stock"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "00000000-0000-0000-0000-000000000000"
     }
   ],
   "observability": {

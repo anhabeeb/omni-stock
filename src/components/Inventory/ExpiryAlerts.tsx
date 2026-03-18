@@ -1,22 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { AlertTriangle, Calendar, Search } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertTriangle, Calendar } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useQuery } from '@tanstack/react-query';
 
 const ExpiryAlerts: React.FC = () => {
-  const [alerts, setAlerts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
 
-  useEffect(() => {
-    fetch(`/api/inventory/expiry-alerts?days=${days}`, {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-    })
-    .then(res => res.json())
-    .then(data => {
-      setAlerts(data);
-      setLoading(false);
-    });
-  }, [days]);
+  const { data: alerts = [], isLoading } = useQuery<any[]>({
+    queryKey: ['inventory', 'expiry-alerts', days],
+    queryFn: async () => {
+      const res = await fetch(`/api/inventory/expiry-alerts?days=${days}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch expiry alerts');
+      return res.json();
+    },
+    staleTime: 60000, // 60 seconds
+  });
 
   return (
     <div className="p-8">
@@ -58,11 +58,11 @@ const ExpiryAlerts: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {loading ? (
+              {isLoading ? (
                 <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-500">Scanning inventory for expiry alerts...</td></tr>
               ) : alerts.length === 0 ? (
                 <tr><td colSpan={6} className="px-6 py-12 text-center text-emerald-500 font-bold">No items found nearing expiry. All clear!</td></tr>
-              ) : alerts.map((a, idx) => {
+              ) : alerts.map((a: any, idx: number) => {
                 const daysLeft = Math.ceil((new Date(a.expiry_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
                 const isExpired = daysLeft <= 0;
                 

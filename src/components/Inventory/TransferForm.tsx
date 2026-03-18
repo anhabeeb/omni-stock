@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Save, ArrowLeft, Search, Scan } from 'lucide-react';
 import { motion } from 'motion/react';
 import BarcodeScanModal from '../Common/BarcodeScanModal';
 
 const TransferForm: React.FC = () => {
   const navigate = useNavigate();
-  const [godowns, setGodowns] = useState<any[]>([]);
-  const [items, setItems] = useState<any[]>([]);
-  const [units, setUnits] = useState<any[]>([]);
+  const queryClient = useQueryClient();
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
   
   const [formData, setFormData] = useState({
@@ -20,19 +19,52 @@ const TransferForm: React.FC = () => {
     items: [] as any[]
   });
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const [g, i, u] = await Promise.all([
-        fetch('/api/godowns').then(res => res.json()),
-        fetch('/api/items').then(res => res.json()),
-        fetch('/api/units').then(res => res.json())
-      ]);
-      setGodowns(g);
-      setItems(i);
-      setUnits(u);
-    };
-    fetchData();
-  }, []);
+  const { data: godowns = [] } = useQuery<any[]>({
+    queryKey: ["master-data", "godowns"],
+    queryFn: () => fetch('/api/godowns').then(res => res.json()),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const { data: items = [] } = useQuery<any[]>({
+    queryKey: ["master-data", "items"],
+    queryFn: () => fetch('/api/items').then(res => res.json()),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const { data: units = [] } = useQuery<any[]>({
+    queryKey: ["master-data", "units"],
+    queryFn: () => fetch('/api/units').then(res => res.json()),
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const mutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch('/api/transfers', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) {
+        const err = await res.json() as any;
+        throw new Error(err.message || "Failed to save transfer");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["kpi"] });
+      queryClient.invalidateQueries({ queryKey: ["alerts"] });
+      queryClient.invalidateQueries({ queryKey: ["stock"] });
+      navigate('/inventory/transfers');
+    },
+    onError: (error: any) => {
+      alert(error.message);
+    }
+  });
 
   const addItem = () => {
     setFormData({
@@ -81,22 +113,9 @@ const TransferForm: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch('/api/transfers', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify(formData)
-    });
-    if (res.ok) {
-      navigate('/inventory/transfers');
-    } else {
-      const err = await res.json() as any;
-      alert(err.message);
-    }
+    mutation.mutate(formData);
   };
 
   return (
@@ -254,8 +273,12 @@ const TransferForm: React.FC = () => {
         </div>
 
         <div className="flex justify-end">
-          <button type="submit" className="bg-emerald-500 hover:bg-emerald-600 text-slate-900 px-8 py-4 rounded-2xl font-bold flex items-center shadow-lg shadow-emerald-500/20 transition-all">
-            <Save className="w-6 h-6 mr-2" /> Save Transfer Draft
+          <button 
+            type="submit"
+            disabled={mutation.isPending}
+            className="bg-emerald-500 hover:bg-emerald-600 text-slate-900 px-8 py-4 rounded-2xl font-bold flex items-center shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50"
+          >
+            <Save className="w-6 h-6 mr-2" /> {mutation.isPending ? "Saving..." : "Save Transfer Draft"}
           </button>
         </div>
       </form>

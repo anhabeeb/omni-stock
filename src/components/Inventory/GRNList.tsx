@@ -1,27 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Plus, Search, FileText, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 
 const GRNList: React.FC = () => {
-  const [grns, setGrns] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    fetchGRNs();
-  }, []);
-
-  const fetchGRNs = async () => {
-    try {
+  const { data: grns = [], isLoading: loading } = useQuery<any[]>({
+    queryKey: ['grns'],
+    queryFn: async () => {
       const response = await fetch('/api/grn', {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
-      const data = await response.json();
-      setGrns(data);
-    } catch (error) {
-      console.error('Error fetching GRNs:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (!response.ok) throw new Error('Failed to fetch GRNs');
+      return response.json();
+    },
+    staleTime: 30000,
+  });
+
+  const filtered = grns.filter((grn: any) => 
+    grn.grn_number.toLowerCase().includes(search.toLowerCase()) ||
+    grn.supplier_id.toLowerCase().includes(search.toLowerCase())
+  );
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -53,6 +52,8 @@ const GRNList: React.FC = () => {
             <input 
               type="text" 
               placeholder="Search GRN number, supplier..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
             />
           </div>
@@ -75,11 +76,11 @@ const GRNList: React.FC = () => {
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-500">Loading GRNs...</td>
                 </tr>
-              ) : grns.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-500">No GRNs found</td>
                 </tr>
-              ) : grns.map((grn) => (
+              ) : filtered.map((grn: any) => (
                 <tr key={grn.id} className="hover:bg-slate-800/30 transition-colors">
                   <td className="px-6 py-4 font-mono text-emerald-500 font-bold">{grn.grn_number}</td>
                   <td className="px-6 py-4 text-slate-300">{grn.supplier_id}</td>

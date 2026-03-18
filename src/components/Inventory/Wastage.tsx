@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Trash2, Plus, Search, Filter, 
   ChevronRight, CheckCircle2, XCircle, 
@@ -9,12 +10,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AttachmentManager } from '../Common/AttachmentManager';
 
 export default function Wastage() {
-  const [records, setRecords] = useState<any[]>([]);
-  const [activeRecord, setActiveRecord] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [godowns, setGodowns] = useState<any[]>([]);
-  const [items, setItems] = useState<any[]>([]);
-  const [units, setUnits] = useState<any[]>([]);
+  const queryClient = useQueryClient();
+  const [activeRecordId, setActiveRecordId] = useState<string | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const [newRecord, setNewRecord] = useState({
     godown_id: '',
@@ -27,33 +24,101 @@ export default function Wastage() {
     items: [] as any[]
   });
 
-  const fetchRecords = async () => {
-    setLoading(true);
-    const token = localStorage.getItem('token');
-    const res = await fetch('/api/wastage', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    setRecords(await res.json());
-    setLoading(false);
-  };
+  const { data: records = [], isLoading: recordsLoading } = useQuery<any[]>({
+    queryKey: ["wastage"],
+    queryFn: async () => {
+      const res = await fetch('/api/wastage', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      return res.json();
+    }
+  });
 
-  const fetchMasters = async () => {
-    const token = localStorage.getItem('token');
-    const headers = { Authorization: `Bearer ${token}` };
-    const [gRes, iRes, uRes] = await Promise.all([
-      fetch('/api/godowns', { headers }),
-      fetch('/api/items', { headers }),
-      fetch('/api/units', { headers })
-    ]);
-    setGodowns(await gRes.json());
-    setItems(await iRes.json());
-    setUnits(await uRes.json());
-  };
+  const { data: godowns = [] } = useQuery<any[]>({
+    queryKey: ["master-data", "godowns"],
+    queryFn: async () => {
+      const res = await fetch('/api/godowns', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 10,
+  });
 
-  useEffect(() => {
-    fetchRecords();
-    fetchMasters();
-  }, []);
+  const { data: items = [] } = useQuery<any[]>({
+    queryKey: ["master-data", "items"],
+    queryFn: async () => {
+      const res = await fetch('/api/items', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const { data: units = [] } = useQuery<any[]>({
+    queryKey: ["master-data", "units"],
+    queryFn: async () => {
+      const res = await fetch('/api/units', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const { data: activeRecord } = useQuery<any>({
+    queryKey: ["wastage", activeRecordId],
+    queryFn: async () => {
+      const res = await fetch(`/api/wastage/${activeRecordId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      return res.json();
+    },
+    enabled: !!activeRecordId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch('/api/wastage', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error("Failed to create wastage record");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wastage"] });
+      setShowNewModal(false);
+    }
+  });
+
+  const postMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/wastage/${id}/post`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!res.ok) {
+        const data = await res.json() as any;
+        throw new Error(data.message);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["wastage", activeRecordId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["stock"] });
+    },
+    onError: (error: any) => {
+      alert(error.message);
+    }
+  });
 
   const handleAddItem = () => {
     setNewRecord({
@@ -73,10 +138,9 @@ export default function Wastage() {
     newItems[index][field] = value;
 
     if (field === 'item_id') {
-      const item = items.find(i => i.id === value);
+      const item = items.find((i: any) => i.id === value);
       if (item) {
         newItems[index].entered_unit_id = item.base_unit_id;
-        // Fetch batches for this item
         const res = await fetch(`/api/inventory/batches?itemId=${value}&godownId=${newRecord.godown_id}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
@@ -93,54 +157,18 @@ export default function Wastage() {
     }
 
     if (field === 'quantity' || field === 'unit_cost') {
-      newItems[index].total_cost = newItems[index].quantity * newItems[index].unit_cost;
+      newItems[index].total_cost = (newItems[index].quantity || 0) * (newItems[index].unit_cost || 0);
     }
 
     setNewRecord({ ...newRecord, items: newItems });
   };
 
-  const handleCreateWastage = async () => {
-    if (!newRecord.godown_id || newRecord.items.length === 0) return alert("Please fill all required fields");
-    const res = await fetch('/api/wastage', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('token')}`
-      },
-      body: JSON.stringify(newRecord)
-    });
-    if (res.ok) {
-      setShowNewModal(false);
-      fetchRecords();
-    }
-  };
-
-  const handleViewRecord = async (id: string) => {
-    const res = await fetch(`/api/wastage/${id}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    });
-    setActiveRecord(await res.json());
-  };
-
-  const handlePost = async () => {
-    if (!activeRecord) return;
-    const res = await fetch(`/api/wastage/${activeRecord.id}/post`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    });
-    if (res.ok) handleViewRecord(activeRecord.id);
-    else {
-      const data = await res.json() as any;
-      alert(data.message);
-    }
-  };
-
-  if (activeRecord) {
+  if (activeRecordId && activeRecord) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={() => { setActiveRecord(null); fetchRecords(); }} className="p-2 hover:bg-slate-800 rounded-xl text-slate-400">
+            <button onClick={() => { setActiveRecordId(null); queryClient.invalidateQueries({ queryKey: ["wastage"] }); }} className="p-2 hover:bg-slate-800 rounded-xl text-slate-400">
               <ChevronRight className="rotate-180" size={24} />
             </button>
             <div>
@@ -150,9 +178,13 @@ export default function Wastage() {
           </div>
           <div className="flex gap-3">
             {activeRecord.status === 'draft' && (
-              <button onClick={handlePost} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2">
+              <button 
+                onClick={() => postMutation.mutate(activeRecord.id)} 
+                disabled={postMutation.isPending}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 disabled:opacity-50"
+              >
                 <Check size={18} />
-                <span>Post Wastage</span>
+                <span>{postMutation.isPending ? "Posting..." : "Post Wastage"}</span>
               </button>
             )}
             <span className={`px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${
@@ -252,10 +284,10 @@ export default function Wastage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {loading ? (
+              {recordsLoading ? (
                 [1,2,3].map(i => <tr key={i} className="animate-pulse"><td colSpan={6} className="px-6 py-8"><div className="h-4 bg-slate-800 rounded w-full" /></td></tr>)
-              ) : records.map((r, i) => (
-                <tr key={i} className="hover:bg-slate-800/30 transition-colors group cursor-pointer" onClick={() => handleViewRecord(r.id)}>
+              ) : records.map((r: any, i: number) => (
+                <tr key={i} className="hover:bg-slate-800/30 transition-colors group cursor-pointer" onClick={() => setActiveRecordId(r.id)}>
                   <td className="px-6 py-4 text-sm text-white font-bold">{r.wastage_number}</td>
                   <td className="px-6 py-4 text-sm text-slate-300">{r.godown_name}</td>
                   <td className="px-6 py-4 text-sm text-slate-400">{new Date(r.wastage_date).toLocaleDateString()}</td>
@@ -299,7 +331,7 @@ export default function Wastage() {
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     <option value="">Select Godown...</option>
-                    {godowns.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    {godowns.map((g: any) => <option key={g.id} value={g.id}>{g.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -366,7 +398,7 @@ export default function Wastage() {
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-500"
                       >
                         <option value="">Select Item...</option>
-                        {items.map(it => <option key={it.id} value={it.id}>{it.name}</option>)}
+                        {items.map((it: any) => <option key={it.id} value={it.id}>{it.name}</option>)}
                       </select>
                     </div>
                     <div>
@@ -409,7 +441,13 @@ export default function Wastage() {
 
               <div className="flex gap-3 pt-4">
                 <button onClick={() => setShowNewModal(false)} className="flex-1 px-4 py-3 rounded-xl border border-slate-700 text-slate-400 font-bold hover:bg-slate-800 transition-colors">Cancel</button>
-                <button onClick={handleCreateWastage} className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-rose-600/20 transition-all">Record Wastage</button>
+                <button 
+                  onClick={() => createMutation.mutate(newRecord)} 
+                  disabled={createMutation.isPending}
+                  className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-rose-600/20 transition-all disabled:opacity-50"
+                >
+                  {createMutation.isPending ? "Recording..." : "Record Wastage"}
+                </button>
               </div>
             </motion.div>
           </div>

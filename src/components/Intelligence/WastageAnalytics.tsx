@@ -1,19 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { 
   AlertTriangle, 
   TrendingDown, 
   Repeat, 
-  DollarSign,
-  ChevronRight,
   Filter,
   Download
 } from 'lucide-react';
 import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
   Tooltip, 
   ResponsiveContainer, 
   Cell,
@@ -21,6 +14,7 @@ import {
   Pie,
   Legend
 } from 'recharts';
+import { useQuery } from '@tanstack/react-query';
 
 interface WastageAnalyticsData {
   totalWastage: number;
@@ -31,25 +25,17 @@ interface WastageAnalyticsData {
 }
 
 export const WastageAnalytics: React.FC = () => {
-  const [data, setData] = useState<WastageAnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
+  const { data, isLoading } = useQuery<WastageAnalyticsData>({
+    queryKey: ['wastage', 'analytics'],
+    queryFn: async () => {
       const res = await fetch('/api/wastage/analytics');
-      if (res.ok) setData(await res.json());
-    } catch (error) {
-      console.error('Error fetching wastage analytics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (!res.ok) throw new Error('Failed to fetch wastage analytics');
+      return res.json();
+    },
+    staleTime: 60000, // 60 seconds
+  });
 
-  if (loading) return <div className="p-8 text-center">Loading Wastage Analytics...</div>;
+  if (isLoading) return <div className="p-8 text-center">Loading Wastage Analytics...</div>;
 
   const COLORS = ['#ef4444', '#f97316', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899'];
 
@@ -81,7 +67,7 @@ export const WastageAnalytics: React.FC = () => {
             </div>
             <div>
               <p className="text-sm text-gray-500 font-medium">Total Loss (30d)</p>
-              <h3 className="text-2xl font-bold text-gray-900">₹{data?.totalWastage.toLocaleString()}</h3>
+              <h3 className="text-2xl font-bold text-gray-900">₹{data?.totalWastage.toLocaleString() || 0}</h3>
             </div>
           </div>
         </div>
@@ -92,7 +78,7 @@ export const WastageAnalytics: React.FC = () => {
             </div>
             <div>
               <p className="text-sm text-gray-500 font-medium">Wastage Incidents</p>
-              <h3 className="text-2xl font-bold text-gray-900">{data?.recordCount}</h3>
+              <h3 className="text-2xl font-bold text-gray-900">{data?.recordCount || 0}</h3>
             </div>
           </div>
         </div>
@@ -103,7 +89,7 @@ export const WastageAnalytics: React.FC = () => {
             </div>
             <div>
               <p className="text-sm text-gray-500 font-medium">Recurring Issues</p>
-              <h3 className="text-2xl font-bold text-gray-900">{data?.recurringWastage.length} Items</h3>
+              <h3 className="text-2xl font-bold text-gray-900">{data?.recurringWastage.length || 0} Items</h3>
             </div>
           </div>
         </div>
@@ -117,7 +103,7 @@ export const WastageAnalytics: React.FC = () => {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={data?.byReason}
+                  data={data?.byReason || []}
                   dataKey="total_value"
                   nameKey="reason"
                   cx="50%"
@@ -125,7 +111,7 @@ export const WastageAnalytics: React.FC = () => {
                   outerRadius={80}
                   label
                 >
-                  {data?.byReason.map((entry, index) => (
+                  {(data?.byReason || []).map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -143,7 +129,7 @@ export const WastageAnalytics: React.FC = () => {
         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
           <h3 className="text-lg font-bold text-gray-900 mb-6">Recurring Wastage (High Frequency)</h3>
           <div className="space-y-4">
-            {data?.recurringWastage.map((item, idx) => (
+            {(data?.recurringWastage || []).map((item, idx) => (
               <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="bg-white p-2 rounded border border-gray-200">
@@ -160,7 +146,7 @@ export const WastageAnalytics: React.FC = () => {
                 </div>
               </div>
             ))}
-            {data?.recurringWastage.length === 0 && (
+            {(!data?.recurringWastage || data.recurringWastage.length === 0) && (
               <div className="text-center py-8 text-gray-400">
                 No recurring wastage patterns detected.
               </div>
@@ -187,7 +173,7 @@ export const WastageAnalytics: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
-              {data?.highValueAlerts.map((alert, idx) => (
+              {(data?.highValueAlerts || []).map((alert, idx) => (
                 <tr key={idx} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 font-medium text-gray-900">{alert.wastage_number}</td>
                   <td className="px-6 py-4 text-gray-500">{new Date(alert.wastage_date).toLocaleDateString()}</td>
@@ -202,7 +188,7 @@ export const WastageAnalytics: React.FC = () => {
                   </td>
                 </tr>
               ))}
-              {data?.highValueAlerts.length === 0 && (
+              {(!data?.highValueAlerts || data.highValueAlerts.length === 0) && (
                 <tr>
                   <td colSpan={5} className="px-6 py-8 text-center text-gray-400">
                     No high-value wastage incidents detected.

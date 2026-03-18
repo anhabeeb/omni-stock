@@ -1,30 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { 
-  AlertTriangle, 
   TrendingDown, 
-  Repeat, 
   DollarSign,
-  ChevronRight,
   Filter,
   Download,
   Activity,
-  ArrowRight,
   BarChart3
 } from 'lucide-react';
 import { 
-  BarChart, 
-  Bar, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer, 
-  Cell,
-  LineChart,
-  Line,
   AreaChart,
   Area
 } from 'recharts';
+import { useQuery } from '@tanstack/react-query';
 
 interface DiscrepancySummary {
   totalVariance: number;
@@ -34,36 +26,32 @@ interface DiscrepancySummary {
 }
 
 export const DiscrepancyAnalytics: React.FC = () => {
-  const [summary, setSummary] = useState<DiscrepancySummary | null>(null);
-  const [trends, setTrends] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: summary, isLoading: summaryLoading } = useQuery<DiscrepancySummary>({
+    queryKey: ['discrepancies', 'summary'],
+    queryFn: async () => {
+      const res = await fetch('/api/discrepancies/summary');
+      if (!res.ok) throw new Error('Failed to fetch discrepancy summary');
+      return res.json();
+    },
+    staleTime: 60000, // 60 seconds
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const { data: trends = [], isLoading: trendsLoading } = useQuery<any[]>({
+    queryKey: ['discrepancies', 'trends'],
+    queryFn: async () => {
+      const res = await fetch('/api/discrepancies/trends');
+      if (!res.ok) throw new Error('Failed to fetch trends');
+      return res.json();
+    },
+    staleTime: 120000, // 120 seconds
+  });
 
-  const fetchData = async () => {
-    try {
-      const [summaryRes, trendsRes] = await Promise.all([
-        fetch('/api/discrepancies/summary'),
-        fetch('/api/discrepancies/trends')
-      ]);
-      
-      if (summaryRes.ok) setSummary(await summaryRes.json());
-      if (trendsRes.ok) setTrends(await trendsRes.json());
-    } catch (error) {
-      console.error('Error fetching discrepancy analytics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) return <div className="p-8 text-center">Loading Discrepancy Analytics...</div>;
+  if (summaryLoading || trendsLoading) return <div className="p-8 text-center">Loading Discrepancy Analytics...</div>;
 
   const stats = [
-    { label: 'Total Variance (30d)', value: `₹${summary?.totalVariance.toLocaleString()}`, icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Shrinkage (Loss)', value: `₹${summary?.shrinkageValue.toLocaleString()}`, icon: TrendingDown, color: 'text-red-600', bg: 'bg-red-50' },
-    { label: 'Overage (Gain)', value: `₹${summary?.overageValue.toLocaleString()}`, icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50' }
+    { label: 'Total Variance (30d)', value: `₹${summary?.totalVariance.toLocaleString() || 0}`, icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Shrinkage (Loss)', value: `₹${summary?.shrinkageValue.toLocaleString() || 0}`, icon: TrendingDown, color: 'text-red-600', bg: 'bg-red-50' },
+    { label: 'Overage (Gain)', value: `₹${summary?.overageValue.toLocaleString() || 0}`, icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50' }
   ];
 
   return (
@@ -126,7 +114,7 @@ export const DiscrepancyAnalytics: React.FC = () => {
         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
           <h3 className="text-lg font-bold text-gray-900 mb-6">High Variance Items</h3>
           <div className="space-y-4">
-            {summary?.highVarianceItems.map((item, idx) => (
+            {(summary?.highVarianceItems || []).map((item, idx) => (
               <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="bg-white p-2 rounded border border-gray-200">
@@ -143,7 +131,7 @@ export const DiscrepancyAnalytics: React.FC = () => {
                 </div>
               </div>
             ))}
-            {summary?.highVarianceItems.length === 0 && (
+            {(!summary?.highVarianceItems || summary.highVarianceItems.length === 0) && (
               <div className="text-center py-8 text-gray-400">
                 No high variance items detected.
               </div>

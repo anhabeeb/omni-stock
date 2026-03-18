@@ -1,27 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Plus, Search, FileText, CheckCircle, XCircle, Clock, Store } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 
 const StockIssueList: React.FC = () => {
-  const [issues, setIssues] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    fetchIssues();
-  }, []);
-
-  const fetchIssues = async () => {
-    try {
+  const { data: issues = [], isLoading: loading } = useQuery<any[]>({
+    queryKey: ['issues'],
+    queryFn: async () => {
       const response = await fetch('/api/issues', {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
-      const data = await response.json();
-      setIssues(data);
-    } catch (error) {
-      console.error('Error fetching issues:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (!response.ok) throw new Error('Failed to fetch issues');
+      return response.json();
+    },
+    staleTime: 30000,
+  });
+
+  const filtered = issues.filter((issue: any) => 
+    issue.issue_number.toLowerCase().includes(search.toLowerCase()) ||
+    issue.outlet_id.toLowerCase().includes(search.toLowerCase())
+  );
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -53,6 +52,8 @@ const StockIssueList: React.FC = () => {
             <input 
               type="text" 
               placeholder="Search issue number, outlet..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
             />
           </div>
@@ -75,11 +76,11 @@ const StockIssueList: React.FC = () => {
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-500">Loading issues...</td>
                 </tr>
-              ) : issues.length === 0 ? (
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-500">No issues found</td>
                 </tr>
-              ) : issues.map((issue) => (
+              ) : filtered.map((issue: any) => (
                 <tr key={issue.id} className="hover:bg-slate-800/30 transition-colors group">
                   <td className="px-6 py-4 font-mono text-emerald-500 font-bold">{issue.issue_number}</td>
                   <td className="px-6 py-4 text-slate-300">

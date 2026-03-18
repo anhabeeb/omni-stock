@@ -1,38 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   AlertTriangle, Clock, Package, Trash2, 
-  ChevronRight, Filter, RefreshCw, AlertCircle,
-  ArrowRight
+  RefreshCw, AlertCircle
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useQuery } from '@tanstack/react-query';
 
 export default function Alerts() {
-  const [alerts, setAlerts] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [godowns, setGodowns] = useState<any[]>([]);
   const [selectedGodown, setSelectedGodown] = useState('');
 
-  const fetchAlerts = async () => {
-    setLoading(true);
-    const token = localStorage.getItem('token');
-    const res = await fetch(`/api/alerts/summary?godownId=${selectedGodown}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    setAlerts(await res.json());
-    setLoading(false);
-  };
+  const { data: alerts, isLoading: alertsLoading, refetch: refetchAlerts } = useQuery<any>({
+    queryKey: ['alerts-summary', selectedGodown],
+    queryFn: async () => {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/alerts/summary?godownId=${selectedGodown}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch alerts');
+      return res.json();
+    },
+    staleTime: 60000, // 60 seconds as per worker cache
+  });
 
-  const fetchGodowns = async () => {
-    const res = await fetch('/api/godowns', {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    });
-    setGodowns(await res.json());
-  };
-
-  useEffect(() => {
-    fetchAlerts();
-    fetchGodowns();
-  }, [selectedGodown]);
+  const { data: godowns = [] } = useQuery<any[]>({
+    queryKey: ['master-data', 'godowns'],
+    queryFn: async () => {
+      const res = await fetch('/api/godowns', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch godowns');
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 10, // 10 minutes
+  });
 
   const AlertSection = ({ title, icon: Icon, data, color, emptyMsg }: any) => (
     <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
@@ -103,13 +102,13 @@ export default function Alerts() {
             className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-500"
           >
             <option value="">All Godowns</option>
-            {godowns.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            {godowns.map((g: any) => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
           <button 
-            onClick={fetchAlerts}
+            onClick={() => refetchAlerts()}
             className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 border border-slate-800"
           >
-            <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
+            <RefreshCw size={20} className={alertsLoading ? "animate-spin" : ""} />
           </button>
         </div>
       </div>

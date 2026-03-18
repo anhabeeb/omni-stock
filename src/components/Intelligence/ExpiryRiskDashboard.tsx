@@ -1,26 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { 
   Clock, 
   AlertCircle, 
   ShieldCheck, 
-  ChevronRight,
   Filter,
   Download,
   ArrowRight
 } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  Cell,
-  PieChart,
-  Pie,
-  Legend
-} from 'recharts';
+import { useQuery } from '@tanstack/react-query';
 
 interface ExpiryRiskData {
   highRiskCount: number;
@@ -33,37 +20,35 @@ interface ExpiryRiskData {
 }
 
 export const ExpiryRiskDashboard: React.FC = () => {
-  const [data, setData] = useState<ExpiryRiskData | null>(null);
-  const [recommendations, setRecommendations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading: riskLoading } = useQuery<ExpiryRiskData>({
+    queryKey: ['expiry', 'risk'],
+    queryFn: async () => {
+      const res = await fetch('/api/expiry/risk');
+      if (!res.ok) throw new Error('Failed to fetch expiry risk data');
+      return res.json();
+    },
+    staleTime: 60000, // 60 seconds
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const { data: recommendations = [], isLoading: recLoading } = useQuery<any[]>({
+    queryKey: ['expiry', 'recommendations'],
+    queryFn: async () => {
+      const res = await fetch('/api/expiry/recommendations');
+      if (!res.ok) throw new Error('Failed to fetch recommendations');
+      return res.json();
+    },
+    staleTime: 120000, // 120 seconds
+  });
 
-  const fetchData = async () => {
-    try {
-      const [riskRes, recRes] = await Promise.all([
-        fetch('/api/expiry/risk'),
-        fetch('/api/expiry/recommendations')
-      ]);
-      
-      if (riskRes.ok) setData(await riskRes.json());
-      if (recRes.ok) setRecommendations(await recRes.json());
-    } catch (error) {
-      console.error('Error fetching expiry risk analytics:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) return <div className="p-8 text-center">Loading Expiry Risk Dashboard...</div>;
+  if (riskLoading || recLoading) return <div className="p-8 text-center">Loading Expiry Risk Dashboard...</div>;
 
   const riskStats = [
     { label: 'High Risk (<30d)', count: data?.highRiskCount, value: data?.highRiskValue, color: 'text-red-600', bg: 'bg-red-50' },
     { label: 'Medium Risk (30-90d)', count: data?.mediumRiskCount, value: data?.mediumRiskValue, color: 'text-orange-600', bg: 'bg-orange-50' },
     { label: 'Low Risk (90-180d)', count: data?.lowRiskCount, value: data?.lowRiskValue, color: 'text-blue-600', bg: 'bg-blue-50' }
   ];
+
+  const totalRiskValue = (data?.highRiskValue || 0) + (data?.mediumRiskValue || 0) + (data?.lowRiskValue || 0) || 1;
 
   return (
     <div className="p-6 space-y-6">
@@ -94,13 +79,13 @@ export const ExpiryRiskDashboard: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm text-gray-500 font-medium">{stat.label}</p>
-                <h3 className="text-2xl font-bold text-gray-900">₹{stat.value?.toLocaleString()}</h3>
+                <h3 className="text-2xl font-bold text-gray-900">₹{stat.value?.toLocaleString() || 0}</h3>
               </div>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">{stat.count} Batches at risk</span>
+              <span className="text-gray-500">{stat.count || 0} Batches at risk</span>
               <span className={`font-medium ${stat.color}`}>
-                {((stat.value || 0) / ( (data?.highRiskValue || 0) + (data?.mediumRiskValue || 0) + (data?.lowRiskValue || 0) || 1 ) * 100).toFixed(1)}% of total risk
+                {((stat.value || 0) / totalRiskValue * 100).toFixed(1)}% of total risk
               </span>
             </div>
           </div>
@@ -112,7 +97,7 @@ export const ExpiryRiskDashboard: React.FC = () => {
         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
           <h3 className="text-lg font-bold text-gray-900 mb-6">Top At-Risk Batches</h3>
           <div className="space-y-4">
-            {data?.topAtRiskItems.map((item, idx) => (
+            {(data?.topAtRiskItems || []).map((item, idx) => (
               <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="bg-white p-2 rounded border border-gray-200">
@@ -129,7 +114,7 @@ export const ExpiryRiskDashboard: React.FC = () => {
                 </div>
               </div>
             ))}
-            {data?.topAtRiskItems.length === 0 && (
+            {(!data?.topAtRiskItems || data.topAtRiskItems.length === 0) && (
               <div className="text-center py-8 text-gray-400">
                 No batches at immediate risk of expiry.
               </div>
@@ -141,7 +126,7 @@ export const ExpiryRiskDashboard: React.FC = () => {
         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
           <h3 className="text-lg font-bold text-gray-900 mb-6">Prevention Recommendations</h3>
           <div className="space-y-4">
-            {recommendations.map((rec, idx) => (
+            {recommendations.map((rec: any, idx: number) => (
               <div key={idx} className="p-4 bg-emerald-50 border border-emerald-100 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">

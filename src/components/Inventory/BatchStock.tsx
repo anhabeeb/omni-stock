@@ -1,24 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Filter, AlertTriangle, Calendar } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, Calendar } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useQuery } from '@tanstack/react-query';
 
 const BatchStock: React.FC = () => {
-  const [stock, setStock] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetch('/api/inventory/current-stock', {
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-    })
-    .then(res => res.json())
-    .then(data => {
-      setStock(data);
-      setLoading(false);
-    });
-  }, []);
+  const { data: stock = [], isLoading } = useQuery<any[]>({
+    queryKey: ['inventory', 'current-stock'],
+    queryFn: async () => {
+      const res = await fetch('/api/inventory/current-stock', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch stock');
+      return res.json();
+    },
+    staleTime: 60000, // 60 seconds
+  });
 
-  const filteredStock = stock.filter(s => 
+  const filteredStock = stock.filter((s: any) => 
     s.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.batch_number?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -58,11 +58,11 @@ const BatchStock: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {loading ? (
+              {isLoading ? (
                 <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-500">Loading inventory data...</td></tr>
               ) : filteredStock.length === 0 ? (
                 <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-500">No stock found matching your search.</td></tr>
-              ) : filteredStock.map((s, idx) => (
+              ) : filteredStock.map((s: any, idx: number) => (
                 <motion.tr 
                   key={idx}
                   initial={{ opacity: 0 }}
