@@ -10,6 +10,7 @@ export interface User {
   role_name?: string;
   is_active: number;
   last_login?: string;
+  password_hash?: string; // Added for internal use
   created_at: string;
   updated_at: string;
 }
@@ -53,6 +54,24 @@ export class UserService {
 
     const { results } = await this.db.prepare(query).bind(...params).all();
     return results as User[];
+  }
+
+  async getUserByUsername(username: string): Promise<User | null> {
+    return await this.db.prepare(`
+      SELECT u.*, r.name as role_name 
+      FROM users u 
+      JOIN roles r ON u.role_id = r.id 
+      WHERE LOWER(u.username) = LOWER(?) AND u.is_active = 1
+    `).bind(username).first() as User;
+  }
+
+  async getUserForLogin(username: string): Promise<User | null> {
+    return await this.db.prepare(`
+      SELECT u.*, r.name as role_name 
+      FROM users u 
+      JOIN roles r ON u.role_id = r.id 
+      WHERE LOWER(u.username) = LOWER(?) AND u.is_active = 1
+    `).bind(username).first() as User;
   }
 
   async getUserById(id: string): Promise<User | null> {

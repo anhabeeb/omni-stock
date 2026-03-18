@@ -250,7 +250,7 @@ export class SetupService {
 
       await this.db.prepare("INSERT OR IGNORE INTO units (code, name) VALUES ('kg', 'Kilogram'), ('g', 'Gram'), ('ltr', 'Liter'), ('pcs', 'Pieces')").run();
       
-      // Default Admin: admin / admin123
+      // Default Admin: admin / omnistock123
       await this.db.prepare(`INSERT OR IGNORE INTO users (id, username, email, password_hash, full_name, role_id, is_active)
         VALUES ('00000000-0000-0000-0000-000000000001', 'admin', 'admin@omnistock.com', '240be518fabd2724ddb6f0403f3d5d2f3c2c208300abb8acc394099c4c544d47', 'System Admin', 'role_super_admin', 1)`).run();
 

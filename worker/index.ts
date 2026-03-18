@@ -158,16 +158,13 @@ app.post("/api/auth/login", rateLimiter, async (c) => {
     }, 400);
   }
   
-  const users = await userService.getUsers({ search: username, is_active: 1 });
-  const user = users.find(u => u.username === username);
+  const user = await userService.getUserForLogin(username);
 
-  if (!user) {
+  if (!user || !user.password_hash) {
     return c.json({ message: "Invalid credentials" }, 401);
   }
 
-  // Get user with password hash
-  const dbUser = await c.env.DB.prepare("SELECT password_hash FROM users WHERE id = ?").bind(user.id).first<{password_hash: string}>();
-  if (!dbUser || !(await verifyPassword(password, dbUser.password_hash))) {
+  if (!(await verifyPassword(password, user.password_hash))) {
     return c.json({ message: "Invalid credentials" }, 401);
   }
 
