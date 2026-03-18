@@ -1,0 +1,22 @@
+{
+  "name": "omni-stock",
+  "main": "worker/index.ts",
+  "compatibility_date": "2024-04-03",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "inventory",
+      "database_id": "47b0154c-a1cc-4bfc-9a68-19f3ba9ae095",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BUCKET",
+      "bucket_name": "inventory-attachments"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

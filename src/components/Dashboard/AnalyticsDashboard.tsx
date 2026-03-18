@@ -1,0 +1,264 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell, LineChart, Line
+} from 'recharts';
+import { 
+  DollarSign, Package, AlertTriangle, Clock, TrendingUp, 
+  TrendingDown, Trash2, Warehouse, Filter, RefreshCw,
+  AlertCircle
+} from 'lucide-react';
+import { motion } from 'motion/react';
+
+const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+
+export default function AnalyticsDashboard() {
+  const [summary, setSummary] = useState<any>(null);
+  const [stockByGodown, setStockByGodown] = useState<any[]>([]);
+  const [stockByCategory, setStockByCategory] = useState<any[]>([]);
+  const [fastMoving, setFastMoving] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [godowns, setGodowns] = useState<any[]>([]);
+  const [filters, setFilters] = useState({
+    godownId: '',
+    from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    to: new Date().toISOString().split('T')[0]
+  });
+
+  const fetchData = async () => {
+    setLoading(true);
+    const token = localStorage.getItem('token');
+    const headers = { Authorization: `Bearer ${token}` };
+    
+    try {
+      const queryParams = new URLSearchParams(filters).toString();
+      const [sRes, gRes, cRes, fRes, godRes] = await Promise.all([
+        fetch(`/api/dashboard/summary?${queryParams}`, { headers }),
+        fetch(`/api/dashboard/stock-by-godown`, { headers }),
+        fetch(`/api/dashboard/stock-by-category`, { headers }),
+        fetch(`/api/dashboard/fast-moving`, { headers }),
+        fetch(`/api/godowns`, { headers })
+      ]);
+
+      setSummary(await sRes.json());
+      setStockByGodown(await gRes.json());
+      setStockByCategory(await cRes.json());
+      setFastMoving(await fRes.json());
+      setGodowns(await godRes.json());
+    } catch (error) {
+      console.error("Dashboard fetch error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [filters.godownId]); // Refresh on godown change
+
+  const StatCard = ({ icon: Icon, label, value, subValue, color }: any) => (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl"
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className={`p-3 rounded-2xl bg-${color}-500/10 text-${color}-500`}>
+          <Icon size={24} />
+        </div>
+        <TrendingUp size={20} className="text-slate-600" />
+      </div>
+      <p className="text-slate-400 text-sm font-medium">{label}</p>
+      <div className="flex items-baseline gap-2 mt-1">
+        <h3 className="text-2xl font-bold text-white">{value}</h3>
+        {subValue && <span className="text-xs text-slate-500">{subValue}</span>}
+      </div>
+    </motion.div>
+  );
+
+  if (loading && !summary) return <div className="p-8 text-center text-slate-400">Loading Analytics...</div>;
+
+  return (
+    <div className="space-y-8">
+      {/* Filters */}
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-slate-400">
+            <Filter size={18} />
+            <span className="text-sm font-medium">Filters:</span>
+          </div>
+          <select 
+            value={filters.godownId}
+            onChange={(e) => setFilters({...filters, godownId: e.target.value})}
+            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            <option value="">All Godowns</option>
+            {godowns.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+        </div>
+        <button 
+          onClick={fetchData}
+          className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 transition-colors"
+        >
+          <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+        </button>
+      </div>
+
+      {/* Summary Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard 
+          icon={DollarSign} 
+          label="Total Stock Value" 
+          value={`$${summary?.totalValue?.toLocaleString()}`} 
+          color="emerald" 
+        />
+        <StatCard 
+          icon={Package} 
+          label="Total Quantity" 
+          value={summary?.totalQuantity?.toLocaleString()} 
+          color="blue" 
+        />
+        <StatCard 
+          icon={AlertTriangle} 
+          label="Low Stock Items" 
+          value={summary?.lowStockCount} 
+          subValue="Requires Reorder"
+          color="amber" 
+        />
+        <StatCard 
+          icon={Trash2} 
+          label="Wastage (Period)" 
+          value={`$${summary?.wastageValue?.toLocaleString()}`} 
+          color="rose" 
+        />
+      </div>
+
+      {/* Health Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatCard 
+          icon={Clock} 
+          label="Near Expiry (30d)" 
+          value={summary?.nearExpiryCount} 
+          color="orange" 
+        />
+        <StatCard 
+          icon={AlertCircle} 
+          label="Dead Stock (90d)" 
+          value={summary?.deadStockCount} 
+          color="slate" 
+        />
+        <StatCard 
+          icon={DollarSign} 
+          label="Expired Value" 
+          value={`$${summary?.expiredValue?.toLocaleString()}`} 
+          color="red" 
+        />
+      </div>
+
+      {/* Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Stock by Godown */}
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
+          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+            <Warehouse size={20} className="text-emerald-500" />
+            Stock Value by Godown
+          </h3>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={stockByGodown}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
+                  itemStyle={{ color: '#fff' }}
+                />
+                <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Stock by Category */}
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
+          <h3 className="text-lg font-bold text-white mb-6">Stock Distribution by Category</h3>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={stockByCategory}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {stockByCategory.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
+                />
+                <Legend verticalAlign="bottom" height={36}/>
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Fast Moving Items */}
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
+          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+            <TrendingUp size={20} className="text-blue-500" />
+            Fast Moving Items (Last 30 Days)
+          </h3>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={fastMoving} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
+                <XAxis type="number" stroke="#64748b" fontSize={12} hide />
+                <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={12} width={100} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
+                />
+                <Bar dataKey="total_issued" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Alerts Summary */}
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl">
+          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+            <AlertTriangle size={20} className="text-amber-500" />
+            Critical Alerts
+          </h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-rose-500/5 border border-rose-500/10 rounded-2xl">
+              <div className="flex items-center gap-3">
+                <Clock className="text-rose-500" size={20} />
+                <span className="text-slate-300 font-medium">Near Expiry Items</span>
+              </div>
+              <span className="text-rose-500 font-bold">{summary?.nearExpiryCount}</span>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="text-amber-500" size={20} />
+                <span className="text-slate-300 font-medium">Low Stock Alerts</span>
+              </div>
+              <span className="text-amber-500 font-bold">{summary?.lowStockCount}</span>
+            </div>
+            <div className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700/50 rounded-2xl">
+              <div className="flex items-center gap-3">
+                <Package className="text-slate-400" size={20} />
+                <span className="text-slate-300 font-medium">Out of Stock Items</span>
+              </div>
+              <span className="text-white font-bold">{summary?.outOfStockCount}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
