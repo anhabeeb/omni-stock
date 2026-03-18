@@ -11,8 +11,10 @@ import {
 import { motion } from 'motion/react';
 import { FinanceSummary } from '../../types';
 import { useQuery } from '@tanstack/react-query';
+import { useSettings } from '../../contexts/SettingsContext';
 
 export default function FinanceDashboard() {
+  const { format } = useSettings();
   const [filters, setFilters] = useState({
     from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     to: new Date().toISOString().split('T')[0]
@@ -78,7 +80,7 @@ export default function FinanceDashboard() {
       </div>
       <div>
         <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">{label}</p>
-        <h3 className="text-2xl font-bold text-white tracking-tight">{value}</h3>
+        <h3 className="text-2xl font-bold text-white tracking-tight">{format(value)}</h3>
         {subValue && <p className="text-xs text-slate-400 mt-1 font-medium">{subValue}</p>}
       </div>
     </motion.div>

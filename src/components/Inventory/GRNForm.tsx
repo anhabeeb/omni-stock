@@ -4,8 +4,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Save, ArrowLeft, Scan } from 'lucide-react';
 import { motion } from 'motion/react';
 import BarcodeScanModal from '../Common/BarcodeScanModal';
+import { useSettings } from '../../contexts/SettingsContext';
 
 const GRNForm: React.FC = () => {
+  const { format } = useSettings();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
@@ -279,7 +281,7 @@ const GRNForm: React.FC = () => {
                       />
                     </td>
                     <td className="px-4 py-3 text-white font-bold">
-                      ${item.total_line_cost.toFixed(2)}
+                      {format(item.total_line_cost)}
                     </td>
                     <td className="px-4 py-3">
                       <button 

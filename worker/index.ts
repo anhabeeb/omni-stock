@@ -35,8 +35,11 @@ import { DiscrepancyService } from './services/discrepancy';
 import { KPIService } from './services/kpi';
 import { AttachmentService } from './services/attachment';
 import { NotificationService } from './services/notification';
+import { UserService } from './services/user';
+import { SettingsService } from './services/settings';
 import { ReferenceType } from '../src/types';
 import { CacheManager } from './cache';
+import { hashPassword, verifyPassword } from './utils/auth';
 
 type Bindings = {
   DB: D1Database;
@@ -96,21 +99,128 @@ const checkRole = (roles: string[]) => async (c: any, next: any) => {
 app.post("/api/auth/login", rateLimiter, async (c) => {
   const { username, password } = await c.req.json();
   const secret = c.env.JWT_SECRET || "omnistock-secret-key-2026";
+  const userService = new UserService(c.env.DB);
   
-  if (username === "admin") {
-    const payload = {
-      id: "u1",
-      username: "admin",
-      role: "super_admin",
-      exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24, // 24h
-    };
-    const token = await sign(payload, secret);
-    return c.json({ 
-      token, 
-      user: { id: "u1", username: "admin", role: "super_admin", fullName: "Super Admin" } 
-    });
+  const users = await userService.getUsers({ search: username, is_active: 1 });
+  const user = users.find(u => u.username === username);
+
+  if (!user) {
+    return c.json({ message: "Invalid credentials" }, 401);
   }
-  return c.json({ message: "Invalid credentials" }, 401);
+
+  // Get user with password hash
+  const dbUser = await c.env.DB.prepare("SELECT password_hash FROM users WHERE id = ?").bind(user.id).first<{password_hash: string}>();
+  if (!dbUser || !(await verifyPassword(password, dbUser.password_hash))) {
+    return c.json({ message: "Invalid credentials" }, 401);
+  }
+
+  await userService.updateLastLogin(user.id);
+  
+  const token = await sign({ 
+    id: user.id, 
+    username: user.username, 
+    role: user.role_name,
+    fullName: user.full_name,
+    exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24 hours
+  }, secret);
+  
+  return c.json({ 
+    token, 
+    user: { 
+      id: user.id, 
+      username: user.username, 
+      role: user.role_name,
+      fullName: user.full_name
+    } 
+  });
+});
+
+// Settings Public
+app.get("/api/settings/public", async (c) => {
+  const settingsService = new SettingsService(c.env.DB);
+  const settings = await settingsService.getPublicSettings();
+  return c.json(settings);
+});
+
+// Users & Settings (Protected)
+app.get("/api/users", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+  const role_id = c.req.query('role_id') ? parseInt(c.req.query('role_id')!) : undefined;
+  const is_active = c.req.query('is_active') ? parseInt(c.req.query('is_active')!) : undefined;
+  const search = c.req.query('search');
+  
+  const userService = new UserService(c.env.DB);
+  const users = await userService.getUsers({ role_id, is_active, search });
+  return c.json(users);
+});
+
+app.get("/api/users/:id", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+  const userService = new UserService(c.env.DB);
+  const user = await userService.getUserById(c.req.param('id'));
+  if (!user) return c.json({ message: "User not found" }, 404);
+  return c.json(user);
+});
+
+app.post("/api/users", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+  const data = await c.req.json();
+  const userService = new UserService(c.env.DB);
+  
+  const passwordHash = await hashPassword(data.password || "omnistock123");
+  const id = await userService.createUser({ ...data, password_hash: passwordHash });
+  
+  return c.json({ id, message: "User created successfully" }, 201);
+});
+
+app.put("/api/users/:id", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+  const data = await c.req.json();
+  const userService = new UserService(c.env.DB);
+  
+  if (data.password) {
+    data.password_hash = await hashPassword(data.password);
+    delete data.password;
+  }
+  
+  await userService.updateUser(c.req.param('id'), data);
+  return c.json({ message: "User updated successfully" });
+});
+
+app.post("/api/users/:id/deactivate", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+  const userService = new UserService(c.env.DB);
+  await userService.deactivateUser(c.req.param('id'));
+  return c.json({ message: "User deactivated" });
+});
+
+app.post("/api/users/:id/reactivate", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+  const userService = new UserService(c.env.DB);
+  await userService.reactivateUser(c.req.param('id'));
+  return c.json({ message: "User reactivated" });
+});
+
+app.post("/api/users/:id/reset-password", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+  const { password } = await c.req.json();
+  const userService = new UserService(c.env.DB);
+  const passwordHash = await hashPassword(password);
+  await userService.resetPassword(c.req.param('id'), passwordHash);
+  return c.json({ message: "Password reset successfully" });
+});
+
+app.get("/api/roles", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+  const userService = new UserService(c.env.DB);
+  const roles = await userService.getRoles();
+  return c.json(roles);
+});
+
+app.get("/api/settings", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+  const settingsService = new SettingsService(c.env.DB);
+  const settings = await settingsService.getSettings();
+  return c.json(settings);
+});
+
+app.put("/api/settings", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+  const data = await c.req.json();
+  const settingsService = new SettingsService(c.env.DB);
+  await settingsService.updateSettings(data);
+  CacheManager.invalidate(c); // Invalidate cache on settings update
+  return c.json({ message: "Settings updated successfully" });
 });
 
 // Master Data

@@ -6,10 +6,12 @@ import {
   Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useSettings } from '../../contexts/SettingsContext';
 
 type ReportType = 'stock' | 'movements' | 'valuation' | 'wastage' | 'expiry';
 
 export default function Reports() {
+  const { format } = useSettings();
   const [activeReport, setActiveReport] = useState<ReportType>('stock');
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -268,7 +270,7 @@ export default function Reports() {
                         <td className="px-6 py-4 text-sm text-slate-400">{row.godown_name}</td>
                         <td className="px-6 py-4 text-sm text-slate-400">{row.category_name}</td>
                         <td className="px-6 py-4 text-sm text-white text-right font-mono">{row.quantity_on_hand}</td>
-                        <td className="px-6 py-4 text-sm text-emerald-400 text-right font-mono">${(row.quantity_on_hand * row.average_unit_cost).toLocaleString()}</td>
+                        <td className="px-6 py-4 text-sm text-emerald-400 text-right font-mono">{format(row.quantity_on_hand * row.average_unit_cost)}</td>
                       </>
                     )}
                     {activeReport === 'movements' && (
@@ -291,7 +293,7 @@ export default function Reports() {
                     {activeReport === 'valuation' && (
                       <>
                         <td className="px-6 py-4 text-sm text-white font-medium">{row.group_name}</td>
-                        <td className="px-6 py-4 text-sm text-emerald-400 text-right font-mono font-bold">${row.total_value.toLocaleString()}</td>
+                        <td className="px-6 py-4 text-sm text-emerald-400 text-right font-mono font-bold">{format(row.total_value)}</td>
                       </>
                     )}
                     {activeReport === 'wastage' && (

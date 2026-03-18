@@ -9,10 +9,12 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useSettings } from '../../contexts/SettingsContext';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 export default function AnalyticsDashboard() {
+  const { format } = useSettings();
   const [summary, setSummary] = useState<any>(null);
   const [stockByGodown, setStockByGodown] = useState<any[]>([]);
   const [stockByCategory, setStockByCategory] = useState<any[]>([]);
@@ -70,7 +72,7 @@ export default function AnalyticsDashboard() {
       </div>
       <p className="text-slate-400 text-sm font-medium">{label}</p>
       <div className="flex items-baseline gap-2 mt-1">
-        <h3 className="text-2xl font-bold text-white">{value}</h3>
+        <h3 className="text-2xl font-bold text-white">{label.toLowerCase().includes('value') ? format(value) : value}</h3>
         {subValue && <span className="text-xs text-slate-500">{subValue}</span>}
       </div>
     </motion.div>

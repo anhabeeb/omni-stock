@@ -8,7 +8,10 @@ import {
   useLocation, 
   useNavigate 
 } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
+import UsersPage from "./components/Admin/UsersPage";
+import SettingsPage from "./components/Admin/SettingsPage";
 import { 
   LayoutDashboard, 
   Package, 
@@ -36,7 +39,9 @@ import {
   PlusCircle,
   FileText,
   Settings2,
-  Trash2
+  Trash2,
+  Moon,
+  Sun
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { clsx, type ClassValue } from "clsx";
@@ -128,12 +133,14 @@ const SidebarItem = ({ icon: Icon, label, to, active }: { icon: any, label: stri
 const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user: User, onLogout: () => void }) => {
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const location = useLocation();
+  const { theme, setTheme } = useSettings();
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden font-sans">
+    <div className={cn("flex h-screen overflow-hidden font-sans", theme === 'dark' ? "bg-slate-950 text-slate-200" : "bg-slate-50 text-slate-800")}>
       {/* Sidebar */}
       <aside className={cn(
-        "bg-slate-900 border-r border-slate-800 transition-all duration-300 flex flex-col",
+        "transition-all duration-300 flex flex-col border-r",
+        theme === 'dark' ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200",
         isSidebarOpen ? "w-64" : "w-20"
       )}>
         <div className="p-6 flex items-center gap-3">
@@ -144,7 +151,7 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
             <motion.span 
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
-              className="text-xl font-bold tracking-tight text-white"
+              className={cn("text-xl font-bold tracking-tight", theme === 'dark' ? "text-white" : "text-slate-900")}
             >
               OmniStock
             </motion.span>
@@ -189,13 +196,24 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
           <SidebarItem icon={Store} label="Outlets" to="/outlets" active={location.pathname === "/outlets"} />
           
           <div className="pt-4 pb-2 px-4">
-            <div className="h-px bg-slate-800" />
+            <div className={cn("h-px", theme === 'dark' ? "bg-slate-800" : "bg-slate-200")} />
           </div>
           <SidebarItem icon={Users} label="Users" to="/users" active={location.pathname === "/users"} />
           <SidebarItem icon={Settings} label="Settings" to="/settings" active={location.pathname === "/settings"} />
         </nav>
 
-        <div className="p-4 border-t border-slate-800">
+        <div className={cn("p-4 border-t", theme === 'dark' ? "border-slate-800" : "border-slate-200")}>
+          <div className="flex gap-2 mb-2">
+            <button 
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className={cn(
+                "flex-1 flex items-center justify-center py-2 rounded-xl transition-all",
+                theme === 'dark' ? "bg-slate-800 text-slate-400 hover:text-white" : "bg-slate-100 text-slate-500 hover:text-slate-900"
+              )}
+            >
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+          </div>
           <button 
             onClick={onLogout}
             className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-slate-400 hover:bg-red-500/10 hover:text-red-500 transition-colors group"
@@ -208,30 +226,33 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur-xl flex items-center justify-between px-8">
+        <header className={cn(
+          "h-16 border-b backdrop-blur-xl flex items-center justify-between px-8",
+          theme === 'dark' ? "border-slate-800 bg-slate-900/50" : "border-slate-200 bg-white/50"
+        )}>
           <div className="flex items-center gap-4">
             <button onClick={() => setSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400">
               {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-            <h1 className="text-lg font-semibold text-white">
+            <h1 className={cn("text-lg font-semibold", theme === 'dark' ? "text-white" : "text-slate-900")}>
               {location.pathname === "/" ? "Dashboard Overview" : 
-               location.pathname.slice(1).charAt(0).toUpperCase() + location.pathname.slice(2)}
+               location.pathname.slice(1).split('/')[0].charAt(0).toUpperCase() + location.pathname.slice(1).split('/')[0].slice(1)}
             </h1>
           </div>
 
           <div className="flex items-center gap-4">
             <NotificationCenter />
             <div className="flex flex-col items-end">
-              <span className="text-sm font-medium text-white">{user.fullName}</span>
+              <span className={cn("text-sm font-medium", theme === 'dark' ? "text-white" : "text-slate-900")}>{user.fullName}</span>
               <span className="text-xs text-slate-400 uppercase tracking-wider">{user.role.replace("_", " ")}</span>
             </div>
-            <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400 font-bold">
+            <div className={cn("w-10 h-10 rounded-full border flex items-center justify-center font-bold", theme === 'dark' ? "bg-slate-800 border-slate-700 text-emerald-400" : "bg-slate-100 border-slate-200 text-emerald-600")}>
               {user.fullName.charAt(0)}
             </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-8 bg-slate-950/50">
+        <div className={cn("flex-1 overflow-y-auto p-8", theme === 'dark' ? "bg-slate-950/50" : "bg-slate-50")}>
           <Suspense fallback={<LoadingSkeleton />}>
             <AnimatePresence mode="wait">
               <motion.div
@@ -266,6 +287,9 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
                   <Route path="/requests" element={<StockRequestList onNewRequest={() => window.location.href = '/requests/new'} onViewRequest={(id) => window.location.href = `/requests/${id}`} />} />
                   <Route path="/requests/new" element={<StockRequestForm onClose={() => window.location.href = '/requests'} onSuccess={() => window.location.href = '/requests'} />} />
                   <Route path="/requests/:id" element={<StockRequestForm requestId={window.location.pathname.split('/').pop()} onClose={() => window.location.href = '/requests'} onSuccess={() => window.location.href = '/requests'} />} />
+
+                  <Route path="/users" element={<UsersPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
 
                   <Route path="/items" element={
                     <MasterListPage 
@@ -399,6 +423,7 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User, token: string) => void }
 };
 
 const DashboardPage = () => {
+  const { format } = useSettings();
   const { data: stats, isLoading: statsLoading } = useQuery<{
     totalStockValue: number;
     totalItems: number;
@@ -468,7 +493,7 @@ const DashboardPage = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard icon={DollarSign} label="Stock Value" value={`$${(stats?.totalStockValue || 0).toLocaleString()}`} color="emerald" />
+        <StatCard icon={DollarSign} label="Stock Value" value={format(stats?.totalStockValue || 0)} color="emerald" />
         <StatCard icon={Package} label="Total Items" value={stats?.totalItems || 0} color="blue" />
         <StatCard icon={AlertTriangle} label="Low Stock" value={stats?.lowStockCount || 0} color="amber" />
         <StatCard icon={Clock} label="Near Expiry" value={stats?.nearExpiryCount || 0} color="rose" />
@@ -640,7 +665,7 @@ const MasterListPage = ({ title, endpoint, columns }: { title: string, endpoint:
 
 // --- Main App ---
 
-export default function App() {
+function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [isReady, setIsReady] = useState(false);
   const { width } = useWindowSize();
@@ -720,5 +745,16 @@ export default function App() {
         </Layout>
       )}
     </Router>
+  );
+}
+
+export default function App() {
+  const queryClient = useQueryClient();
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SettingsProvider>
+        <AppContent />
+      </SettingsProvider>
+    </QueryClientProvider>
   );
 }

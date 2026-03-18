@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Search, Calendar } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useQuery } from '@tanstack/react-query';
+import { useSettings } from '../../contexts/SettingsContext';
 
 const BatchStock: React.FC = () => {
+  const { format } = useSettings();
   const [searchTerm, setSearchTerm] = useState('');
 
   const { data: stock = [], isLoading } = useQuery<any[]>({
@@ -91,7 +93,7 @@ const BatchStock: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 text-right text-slate-400">{s.reserved_quantity || 0}</td>
                   <td className="px-6 py-4 text-right text-emerald-400 font-mono">
-                    ${(s.average_unit_cost || 0).toFixed(2)}
+                    {format(s.average_unit_cost || 0)}
                   </td>
                 </motion.tr>
               ))}
