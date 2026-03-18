@@ -348,7 +348,7 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
 
 const LoginPage = ({ onLogin }: { onLogin: (user: User, token: string) => void }) => {
   const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("password");
+  const [password, setPassword] = useState("admin123");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {

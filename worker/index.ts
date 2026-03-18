@@ -44,7 +44,7 @@ import { hashPassword, verifyPassword } from './utils/auth';
 type Bindings = {
   DB: D1Database;
   BUCKET: R2Bucket;
-  OMNI_STOCK: KVNamespace;
+  "omni-stock": KVNamespace;
   JWT_SECRET: string;
 };
 
@@ -61,7 +61,7 @@ app.use('*', async (c, next) => {
 });
 
 const rateLimiter = async (c: any, next: any) => {
-  if (!c.env.OMNI_STOCK) {
+  if (!c.env['omni-stock']) {
     await next();
     return;
   }
@@ -69,14 +69,14 @@ const rateLimiter = async (c: any, next: any) => {
   const path = c.req.path;
   const key = `ratelimit:${ip}:${path}`;
   
-  const current = await c.env.OMNI_STOCK.get(key);
+  const current = await c.env['omni-stock'].get(key);
   const count = current ? parseInt(current) : 0;
   
   if (count >= 100) { // 100 requests per window
     return c.json({ message: "Too many requests" }, 429);
   }
   
-  await c.env.OMNI_STOCK.put(key, (count + 1).toString(), { expirationTtl: 60 }); // 1 minute window
+  await c.env['omni-stock'].put(key, (count + 1).toString(), { expirationTtl: 60 }); // 1 minute window
   await next();
 };
 
@@ -919,8 +919,8 @@ app.get("/api/kpi/summary", authMiddleware, async (c) => {
   const summary = await kpiService.getWarehouseSummary(godownId);
   
   // Store in KV for cross-region access if available
-  if (c.env.OMNI_STOCK) {
-    await c.env.OMNI_STOCK.put(`kpi_summary_${godownId || 'all'}`, JSON.stringify(summary), { expirationTtl: 60 });
+  if (c.env['omni-stock']) {
+    await c.env['omni-stock'].put(`kpi_summary_${godownId || 'all'}`, JSON.stringify(summary), { expirationTtl: 60 });
   }
   
   return CacheManager.put(c, c.json(summary), 30);
