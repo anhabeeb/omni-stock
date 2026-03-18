@@ -27,7 +27,7 @@ interface User {
   email: string;
   full_name: string;
   phone?: string;
-  role_id: number;
+  role_id: string;
   role_name: string;
   is_active: number;
   last_login?: string;
@@ -35,18 +35,56 @@ interface User {
 }
 
 interface Role {
-  id: number;
+  id: string;
   name: string;
   description?: string;
+}
+
+function RoleCard({ role }: { role: Role }) {
+  const { data: permissions = [], isLoading } = useQuery<string[]>({
+    queryKey: ['role-permissions', role.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/roles/${role.id}/permissions`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch permissions');
+      return res.json();
+    }
+  });
+
+  return (
+    <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4">
+      <h4 className="font-bold text-white mb-1">{role.name}</h4>
+      <p className="text-xs text-slate-500 mb-4">{role.description}</p>
+      
+      <div className="space-y-1.5">
+        {isLoading ? (
+          <div className="h-4 bg-slate-700 rounded animate-pulse w-full" />
+        ) : (
+          permissions.map(p => (
+            <div key={p} className="flex items-center gap-2 text-[10px] text-slate-400">
+              <div className="w-1 h-1 rounded-full bg-emerald-500" />
+              {p}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function UsersPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState<number | ''>('');
+  const [roleFilter, setRoleFilter] = useState<string | ''>('');
   const [statusFilter, setStatusFilter] = useState<number | ''>('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resettingUser, setResettingUser] = useState<User | null>(null);
+
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
 
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ['users', search, roleFilter, statusFilter],
@@ -118,13 +156,15 @@ export default function UsersPage() {
           <h2 className="text-2xl font-bold text-white">User Management</h2>
           <p className="text-slate-400 text-sm mt-1">Manage system users, roles and permissions.</p>
         </div>
-        <button 
-          onClick={() => { setEditingUser(null); setIsModalOpen(true); }}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2"
-        >
-          <UserPlus size={18} />
-          <span>Add User</span>
-        </button>
+        {hasPermission('users.create') && (
+          <button 
+            onClick={() => { setEditingUser(null); setIsModalOpen(true); }}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2"
+          >
+            <UserPlus size={18} />
+            <span>Add User</span>
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -141,7 +181,7 @@ export default function UsersPage() {
         </div>
         <select 
           value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value ? parseInt(e.target.value) : '')}
+          onChange={(e) => setRoleFilter(e.target.value)}
           className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
         >
           <option value="">All Roles</option>
@@ -211,27 +251,63 @@ export default function UsersPage() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button 
-                        onClick={() => { setEditingUser(user); setIsModalOpen(true); }}
-                        className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
-                      >
-                        <Edit2 size={16} />
-                      </button>
-                      <button 
-                        onClick={() => toggleStatusMutation.mutate({ id: user.id, active: !!user.is_active })}
-                        className={cn(
-                          "p-2 hover:bg-slate-800 rounded-lg transition-colors",
-                          user.is_active ? "text-rose-400 hover:text-rose-300" : "text-emerald-400 hover:text-emerald-300"
-                        )}
-                      >
-                        {user.is_active ? <UserMinus size={16} /> : <UserPlus size={16} />}
-                      </button>
+                      {hasPermission('users.update') && (
+                        <>
+                          <button 
+                            onClick={() => { setEditingUser(user); setIsModalOpen(true); }}
+                            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                            title="Edit User"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button 
+                            onClick={() => { setResettingUser(user); setIsResetModalOpen(true); }}
+                            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                            title="Reset Password"
+                          >
+                            <Lock size={16} />
+                          </button>
+                        </>
+                      )}
+                      {hasPermission('users.deactivate') && user.id !== currentUser.id && (
+                        <button 
+                          onClick={() => toggleStatusMutation.mutate({ id: user.id, active: !!user.is_active })}
+                          className={cn(
+                            "p-2 hover:bg-slate-800 rounded-lg transition-colors",
+                            user.is_active ? "text-rose-400 hover:text-rose-300" : "text-emerald-400 hover:text-emerald-300"
+                          )}
+                          title={user.is_active ? "Deactivate" : "Reactivate"}
+                        >
+                          {user.is_active ? <UserMinus size={16} /> : <UserPlus size={16} />}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Role Permissions Viewer */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+            <Shield size={24} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Role Permissions Reference</h3>
+            <p className="text-slate-400 text-sm">View permissions assigned to each system role.</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {roles.map(role => (
+            <div key={role.id}>
+              <RoleCard role={role} />
+            </div>
+          ))}
         </div>
       </div>
 
@@ -333,6 +409,74 @@ export default function UsersPage() {
                     className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all"
                   >
                     {saveUserMutation.isPending ? 'Saving...' : 'Save User'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Reset Password Modal */}
+      <AnimatePresence>
+        {isResetModalOpen && resettingUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
+            >
+              <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+                <h3 className="text-xl font-bold text-white">Reset Password</h3>
+                <button onClick={() => setIsResetModalOpen(false)} className="text-slate-500 hover:text-white"><XCircle size={20} /></button>
+              </div>
+              <form 
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const password = formData.get('password') as string;
+                  
+                  const res = await fetch(`/api/users/${resettingUser.id}/reset-password`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Authorization: `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({ password }),
+                  });
+                  
+                  if (res.ok) {
+                    setIsResetModalOpen(false);
+                    setResettingUser(null);
+                    alert('Password reset successfully');
+                  } else {
+                    alert('Failed to reset password');
+                  }
+                }}
+                className="p-6 space-y-4"
+              >
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-400">New Password for {resettingUser.full_name}</label>
+                  <input 
+                    name="password"
+                    type="password"
+                    required
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                </div>
+                <div className="pt-4 flex gap-3">
+                  <button 
+                    type="button"
+                    onClick={() => setIsResetModalOpen(false)}
+                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-2 rounded-xl transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all"
+                  >
+                    Reset Password
                   </button>
                 </div>
               </form>

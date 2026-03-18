@@ -6,7 +6,7 @@ export interface User {
   email: string;
   full_name: string;
   phone?: string;
-  role_id: number;
+  role_id: string;
   role_name?: string;
   is_active: number;
   last_login?: string;
@@ -15,16 +15,16 @@ export interface User {
 }
 
 export interface Role {
-  id: number;
+  id: string;
   name: string;
   description?: string;
-  permissions: string; // JSON string
+  permissions?: string[];
 }
 
 export class UserService {
   constructor(private db: any) {}
 
-  async getUsers(filters?: { role_id?: number; is_active?: number; search?: string }): Promise<User[]> {
+  async getUsers(filters?: { role_id?: string; is_active?: number; search?: string }): Promise<User[]> {
     let query = `
       SELECT u.*, r.name as role_name 
       FROM users u 
@@ -62,6 +62,18 @@ export class UserService {
       JOIN roles r ON u.role_id = r.id 
       WHERE u.id = ?
     `).bind(id).first() as User;
+  }
+
+  async getUserPermissions(userId: string): Promise<string[]> {
+    const query = `
+      SELECT p.key
+      FROM permissions p
+      JOIN role_permissions rp ON p.id = rp.permission_id
+      JOIN users u ON u.role_id = rp.role_id
+      WHERE u.id = ?
+    `;
+    const { results } = await this.db.prepare(query).bind(userId).all();
+    return results.map((r: any) => r.key);
   }
 
   async createUser(userData: Partial<User> & { password_hash: string }): Promise<string> {
@@ -109,8 +121,19 @@ export class UserService {
   }
 
   async getRoles(): Promise<Role[]> {
-    const { results } = await this.db.prepare("SELECT * FROM roles ORDER BY id ASC").all();
+    const { results } = await this.db.prepare("SELECT * FROM roles ORDER BY name ASC").all();
     return results as Role[];
+  }
+
+  async getRolePermissions(roleId: string): Promise<string[]> {
+    const query = `
+      SELECT p.key
+      FROM permissions p
+      JOIN role_permissions rp ON p.id = rp.permission_id
+      WHERE rp.role_id = ?
+    `;
+    const { results } = await this.db.prepare(query).bind(roleId).all();
+    return results.map((r: any) => r.key);
   }
 
   async updateLastLogin(id: string): Promise<void> {

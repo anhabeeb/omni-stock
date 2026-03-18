@@ -110,7 +110,25 @@ interface User {
   username: string;
   role: string;
   fullName: string;
+  permissions: string[];
 }
+
+// --- Permission Gate ---
+const PermissionGate = ({ 
+  permission, 
+  children, 
+  user,
+  fallback = null 
+}: { 
+  permission: string, 
+  children: React.ReactNode, 
+  user: User,
+  fallback?: React.ReactNode
+}) => {
+  const hasPermission = user.role === 'super_admin' || user.permissions.includes(permission);
+  if (!hasPermission) return <>{fallback}</>;
+  return <>{children}</>;
+};
 
 // --- Components ---
 
@@ -163,11 +181,18 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
           <SidebarItem icon={LayoutDashboard} label="Dashboard" to="/" active={location.pathname === "/"} />
           
           <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Reports & Analytics</div>
-          <SidebarItem icon={BarChart3} label="Analytics" to="/analytics" active={location.pathname === "/analytics"} />
-          {(user.role === 'super_admin' || user.role === 'warehouse_manager') && (
+          <PermissionGate user={user} permission="analytics.view">
+            <SidebarItem icon={BarChart3} label="Analytics" to="/analytics" active={location.pathname === "/analytics"} />
+          </PermissionGate>
+          
+          <PermissionGate user={user} permission="finance.view">
             <SidebarItem icon={DollarSign} label="Finance & Profit" to="/finance" active={location.pathname === "/finance"} />
-          )}
-          <SidebarItem icon={AlertCircle} label="Smart Alerts" to="/smart-alerts" active={location.pathname === "/smart-alerts"} />
+          </PermissionGate>
+          
+          <PermissionGate user={user} permission="alerts.view">
+            <SidebarItem icon={AlertCircle} label="Smart Alerts" to="/smart-alerts" active={location.pathname === "/smart-alerts"} />
+          </PermissionGate>
+          
           <SidebarItem icon={FileText} label="Advanced Reports" to="/reports" active={location.pathname === "/reports"} />
           <SidebarItem icon={AlertTriangle} label="System Alerts" to="/alerts" active={location.pathname === "/alerts"} />
           <SidebarItem icon={History} label="Movement Ledger" to="/ledger" active={location.pathname === "/ledger"} />
@@ -179,21 +204,44 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
           <SidebarItem icon={AlertTriangle} label="Shrinkage Analytics" to="/intelligence/shrinkage" active={location.pathname === "/intelligence/shrinkage"} />
 
           <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Warehouse Control</div>
-          <SidebarItem icon={Truck} label="Stock Requests" to="/requests" active={location.pathname === "/requests"} />
+          <PermissionGate user={user} permission="stock_requests.view">
+            <SidebarItem icon={Truck} label="Stock Requests" to="/requests" active={location.pathname === "/requests"} />
+          </PermissionGate>
 
           <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Inventory Ops</div>
-          <SidebarItem icon={PlusCircle} label="New GRN" to="/grn/new" active={location.pathname === "/grn/new"} />
-          <SidebarItem icon={FileText} label="New Issue" to="/issues/new" active={location.pathname === "/issues/new"} />
-          <SidebarItem icon={ArrowRightLeft} label="New Transfer" to="/transfers/new" active={location.pathname === "/transfers/new"} />
-          <SidebarItem icon={Settings2} label="New Adjustment" to="/adjustments/new" active={location.pathname === "/adjustments/new"} />
-          <SidebarItem icon={ClipboardList} label="Stock Count" to="/stock-count" active={location.pathname === "/stock-count"} />
-          <SidebarItem icon={Trash2} label="Wastage" to="/wastage" active={location.pathname === "/wastage"} />
+          <PermissionGate user={user} permission="inventory.grn">
+            <SidebarItem icon={PlusCircle} label="New GRN" to="/grn/new" active={location.pathname === "/grn/new"} />
+          </PermissionGate>
+          <PermissionGate user={user} permission="inventory.issue">
+            <SidebarItem icon={FileText} label="New Issue" to="/issues/new" active={location.pathname === "/issues/new"} />
+          </PermissionGate>
+          <PermissionGate user={user} permission="inventory.transfer">
+            <SidebarItem icon={ArrowRightLeft} label="New Transfer" to="/transfers/new" active={location.pathname === "/transfers/new"} />
+          </PermissionGate>
+          <PermissionGate user={user} permission="inventory.adjust">
+            <SidebarItem icon={Settings2} label="New Adjustment" to="/adjustments/new" active={location.pathname === "/adjustments/new"} />
+          </PermissionGate>
+          <PermissionGate user={user} permission="inventory.count">
+            <SidebarItem icon={ClipboardList} label="Stock Count" to="/stock-count" active={location.pathname === "/stock-count"} />
+          </PermissionGate>
+          <PermissionGate user={user} permission="inventory.wastage">
+            <SidebarItem icon={Trash2} label="Wastage" to="/wastage" active={location.pathname === "/wastage"} />
+          </PermissionGate>
 
           <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Master Data</div>
           <SidebarItem icon={Package} label="Items" to="/items" active={location.pathname === "/items"} />
           <SidebarItem icon={Truck} label="Suppliers" to="/suppliers" active={location.pathname === "/suppliers"} />
           <SidebarItem icon={Warehouse} label="Godowns" to="/godowns" active={location.pathname === "/godowns"} />
           <SidebarItem icon={Store} label="Outlets" to="/outlets" active={location.pathname === "/outlets"} />
+          
+          <PermissionGate user={user} permission="users.view">
+            <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Administration</div>
+            <SidebarItem icon={Users} label="Users" to="/users" active={location.pathname === "/users"} />
+          </PermissionGate>
+          
+          <PermissionGate user={user} permission="settings.view">
+            <SidebarItem icon={Settings} label="Settings" to="/settings" active={location.pathname === "/settings"} />
+          </PermissionGate>
           
           <div className="pt-4 pb-2 px-4">
             <div className={cn("h-px", theme === 'dark' ? "bg-slate-800" : "bg-slate-200")} />
@@ -350,6 +398,26 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User, token: string) => void }
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("admin123");
   const [loading, setLoading] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
+  const [setupMessage, setSetupMessage] = useState("");
+
+  const handleSetup = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/setup/init", { method: "POST" });
+      const data = await res.json() as any;
+      if (res.ok) {
+        setSetupMessage("Database initialized! You can now login.");
+        setNeedsSetup(false);
+      } else {
+        alert(data.message || "Setup failed");
+      }
+    } catch (err) {
+      alert("Setup failed");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -363,6 +431,9 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User, token: string) => void }
       const data = await res.json() as any;
       if (res.ok) {
         onLogin(data.user, data.token);
+      } else if (data.needsSetup) {
+        setNeedsSetup(true);
+        setSetupMessage(data.message);
       } else {
         alert(data.message);
       }
@@ -388,35 +459,56 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User, token: string) => void }
           <p className="text-slate-400 mt-1">Warehouse Management System</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Username</label>
-            <input 
-              type="text" 
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-              placeholder="Enter your username"
-            />
+        {setupMessage && (
+          <div className={cn("mb-6 p-4 rounded-xl text-sm font-medium text-center", needsSetup ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20")}>
+            {setupMessage}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
-            <input 
-              type="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-              placeholder="Enter your password"
-            />
+        )}
+
+        {needsSetup ? (
+          <div className="space-y-6">
+            <p className="text-slate-400 text-center text-sm">
+              It looks like the database hasn't been set up yet. Click the button below to initialize the system with the default admin account.
+            </p>
+            <button 
+              onClick={handleSetup}
+              disabled={loading}
+              className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-amber-600/20 transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              {loading ? "Initializing..." : "Initialize Database"}
+            </button>
           </div>
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-600/20 transition-all active:scale-[0.98] disabled:opacity-50"
-          >
-            {loading ? "Authenticating..." : "Sign In"}
-          </button>
-        </form>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Username</label>
+              <input 
+                type="text" 
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                placeholder="Enter your username"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
+              <input 
+                type="password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                placeholder="Enter your password"
+              />
+            </div>
+            <button 
+              type="submit"
+              disabled={loading}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-600/20 transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              {loading ? "Authenticating..." : "Sign In"}
+            </button>
+          </form>
+        )}
       </motion.div>
     </div>
   );

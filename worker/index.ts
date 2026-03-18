@@ -1,5 +1,5 @@
 /// <reference types="@cloudflare/workers-types" />
-import { Hono } from 'hono';
+import { Hono, Context, Next } from 'hono';
 import { z } from 'zod';
 
 const grnSchema = z.object({
@@ -37,6 +37,7 @@ import { AttachmentService } from './services/attachment';
 import { NotificationService } from './services/notification';
 import { UserService } from './services/user';
 import { SettingsService } from './services/settings';
+import { SetupService } from './services/setup';
 import { ReferenceType } from '../src/types';
 import { CacheManager } from './cache';
 import { hashPassword, verifyPassword } from './utils/auth';
@@ -48,7 +49,13 @@ type Bindings = {
   JWT_SECRET: string;
 };
 
-const app = new Hono<{ Bindings: Bindings }>();
+type Variables = {
+  jwtPayload: any;
+  user: any;
+  permissions: string[];
+};
+
+const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // --- Security Middleware ---
 app.use('*', async (c, next) => {
@@ -83,18 +90,55 @@ const rateLimiter = async (c: any, next: any) => {
 app.use('*', cors());
 
 // --- Auth Middleware ---
-const authMiddleware = (c: any, next: any) => {
+const authMiddleware = async (c: Context<{ Bindings: Bindings; Variables: Variables }>, next: Next) => {
   const secret = c.env.JWT_SECRET || "omnistock-secret-key-2026";
-  return jwt({ secret, alg: 'HS256' })(c, next);
+  const jwtMiddleware = jwt({ secret, alg: 'HS256' });
+  
+  try {
+    // Run JWT middleware to verify token and set jwtPayload
+    let jwtError = false;
+    await jwtMiddleware(c, async () => {
+      // If we are here, JWT is valid
+    }).catch(() => {
+      jwtError = true;
+    });
+
+    if (jwtError || !c.get('jwtPayload')) {
+      return c.json({ message: "Unauthorized" }, 401);
+    }
+
+    const payload = c.get('jwtPayload');
+    const userService = new UserService(c.env.DB);
+    
+    // Fetch user to ensure they are still active and get latest permissions
+    const user = await userService.getUserById(payload.id);
+    if (!user || !user.is_active) {
+      return c.json({ message: "Unauthorized: User is inactive or not found" }, 401);
+    }
+    
+    const permissions = await userService.getUserPermissions(user.id);
+    
+    // Attach to context
+    c.set('user', user);
+    c.set('permissions', permissions);
+    
+    await next();
+  } catch (e) {
+    return c.json({ message: "Unauthorized" }, 401);
+  }
 };
 
 // --- RBAC Helper ---
-const checkRole = (roles: string[]) => async (c: any, next: any) => {
-  const payload = c.get('jwtPayload') as any;
-  if (!payload || !roles.includes(payload.role)) {
-    return c.json({ message: "Forbidden: Insufficient permissions" }, 403);
+const requirePermission = (permission: string) => async (c: Context<{ Bindings: Bindings; Variables: Variables }>, next: Next) => {
+  const permissions = c.get('permissions') as string[];
+  const user = c.get('user') as any;
+  
+  // Super admin bypass
+  if (user.role_name === 'super_admin' || permissions.includes(permission)) {
+    await next();
+  } else {
+    return c.json({ message: `Forbidden: Missing permission ${permission}` }, 403);
   }
-  await next();
 };
 
 // --- API Routes ---
@@ -104,6 +148,15 @@ app.post("/api/auth/login", rateLimiter, async (c) => {
   const { username, password } = await c.req.json();
   const secret = c.env.JWT_SECRET || "omnistock-secret-key-2026";
   const userService = new UserService(c.env.DB);
+  const setupService = new SetupService(c.env.DB);
+  
+  // Check if DB is initialized
+  if (!(await setupService.isInitialized())) {
+    return c.json({ 
+      message: "Database not initialized. Please run setup.",
+      needsSetup: true 
+    }, 400);
+  }
   
   const users = await userService.getUsers({ search: username, is_active: 1 });
   const user = users.find(u => u.username === username);
@@ -127,6 +180,8 @@ app.post("/api/auth/login", rateLimiter, async (c) => {
     fullName: user.full_name,
     exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24 hours
   }, secret);
+
+  const permissions = await userService.getUserPermissions(user.id);
   
   return c.json({ 
     token, 
@@ -134,7 +189,8 @@ app.post("/api/auth/login", rateLimiter, async (c) => {
       id: user.id, 
       username: user.username, 
       role: user.role_name,
-      fullName: user.full_name
+      fullName: user.full_name,
+      permissions
     } 
   });
 });
@@ -146,9 +202,22 @@ app.get("/api/settings/public", async (c) => {
   return c.json(settings);
 });
 
+// Setup & Initialization
+app.get("/api/setup/status", async (c) => {
+  const setupService = new SetupService(c.env.DB);
+  const initialized = await setupService.isInitialized();
+  return c.json({ initialized });
+});
+
+app.post("/api/setup/init", async (c) => {
+  const setupService = new SetupService(c.env.DB);
+  const result = await setupService.initialize();
+  return c.json(result, result.success ? 200 : 500);
+});
+
 // Users & Settings (Protected)
-app.get("/api/users", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
-  const role_id = c.req.query('role_id') ? parseInt(c.req.query('role_id')!) : undefined;
+app.get("/api/users", authMiddleware, requirePermission('users.view'), async (c) => {
+  const role_id = c.req.query('role_id');
   const is_active = c.req.query('is_active') ? parseInt(c.req.query('is_active')!) : undefined;
   const search = c.req.query('search');
   
@@ -157,16 +226,22 @@ app.get("/api/users", authMiddleware, checkRole(['super_admin', 'admin']), async
   return c.json(users);
 });
 
-app.get("/api/users/:id", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+app.get("/api/users/:id", authMiddleware, requirePermission('users.view'), async (c) => {
   const userService = new UserService(c.env.DB);
   const user = await userService.getUserById(c.req.param('id'));
   if (!user) return c.json({ message: "User not found" }, 404);
   return c.json(user);
 });
 
-app.post("/api/users", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+app.post("/api/users", authMiddleware, requirePermission('users.create'), async (c) => {
   const data = await c.req.json();
   const userService = new UserService(c.env.DB);
+  const currentUser = c.get('user');
+
+  // Validation
+  if (data.role_id === 'role_super_admin' && currentUser.role_name !== 'super_admin') {
+    return c.json({ message: "Only super_admin can create super_admin users" }, 403);
+  }
   
   const passwordHash = await hashPassword(data.password || "omnistock123");
   const id = await userService.createUser({ ...data, password_hash: passwordHash });
@@ -174,52 +249,89 @@ app.post("/api/users", authMiddleware, checkRole(['super_admin', 'admin']), asyn
   return c.json({ id, message: "User created successfully" }, 201);
 });
 
-app.put("/api/users/:id", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+app.put("/api/users/:id", authMiddleware, requirePermission('users.update'), async (c) => {
+  const id = c.req.param('id');
   const data = await c.req.json();
   const userService = new UserService(c.env.DB);
-  
+  const currentUser = c.get('user');
+
+  const targetUser = await userService.getUserById(id);
+  if (!targetUser) return c.json({ message: "User not found" }, 404);
+
+  // Security checks
+  if (targetUser.role_name === 'super_admin' && currentUser.role_name !== 'super_admin') {
+    return c.json({ message: "Only super_admin can modify super_admin users" }, 403);
+  }
+
   if (data.password) {
     data.password_hash = await hashPassword(data.password);
     delete data.password;
   }
-  
-  await userService.updateUser(c.req.param('id'), data);
+
+  await userService.updateUser(id, data);
   return c.json({ message: "User updated successfully" });
 });
 
-app.post("/api/users/:id/deactivate", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+app.post("/api/users/:id/deactivate", authMiddleware, requirePermission('users.deactivate'), async (c) => {
+  const id = c.req.param('id');
   const userService = new UserService(c.env.DB);
-  await userService.deactivateUser(c.req.param('id'));
+  const currentUser = c.get('user');
+
+  if (id === currentUser.id) {
+    return c.json({ message: "Cannot deactivate yourself" }, 400);
+  }
+
+  const targetUser = await userService.getUserById(id);
+  if (targetUser?.role_name === 'super_admin' && currentUser.role_name !== 'super_admin') {
+    return c.json({ message: "Only super_admin can deactivate super_admin users" }, 403);
+  }
+
+  await userService.deactivateUser(id);
   return c.json({ message: "User deactivated" });
 });
 
-app.post("/api/users/:id/reactivate", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+app.post("/api/users/:id/reactivate", authMiddleware, requirePermission('users.update'), async (c) => {
+  const id = c.req.param('id');
   const userService = new UserService(c.env.DB);
-  await userService.reactivateUser(c.req.param('id'));
+  await userService.reactivateUser(id);
   return c.json({ message: "User reactivated" });
 });
 
-app.post("/api/users/:id/reset-password", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+app.post("/api/users/:id/reset-password", authMiddleware, requirePermission('users.update'), async (c) => {
+  const id = c.req.param('id');
   const { password } = await c.req.json();
   const userService = new UserService(c.env.DB);
-  const passwordHash = await hashPassword(password);
-  await userService.resetPassword(c.req.param('id'), passwordHash);
+  const currentUser = c.get('user');
+
+  const targetUser = await userService.getUserById(id);
+  if (targetUser?.role_name === 'super_admin' && currentUser.role_name !== 'super_admin') {
+    return c.json({ message: "Only super_admin can reset super_admin passwords" }, 403);
+  }
+
+  const hash = await hashPassword(password);
+  await userService.resetPassword(id, hash);
   return c.json({ message: "Password reset successfully" });
 });
 
-app.get("/api/roles", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+app.get("/api/roles", authMiddleware, requirePermission('roles.view'), async (c) => {
   const userService = new UserService(c.env.DB);
   const roles = await userService.getRoles();
   return c.json(roles);
 });
 
-app.get("/api/settings", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+app.get("/api/roles/:id/permissions", authMiddleware, requirePermission('roles.view'), async (c) => {
+  const userService = new UserService(c.env.DB);
+  const permissions = await userService.getRolePermissions(c.req.param('id'));
+  return c.json(permissions);
+});
+
+app.get("/api/settings", authMiddleware, requirePermission('settings.view'), async (c) => {
   const settingsService = new SettingsService(c.env.DB);
   const settings = await settingsService.getSettings();
   return c.json(settings);
 });
 
-app.put("/api/settings", authMiddleware, checkRole(['super_admin', 'admin']), async (c) => {
+app.put("/api/settings", authMiddleware, requirePermission('settings.update'), async (c) => {
   const data = await c.req.json();
   const settingsService = new SettingsService(c.env.DB);
   await settingsService.updateSettings(data);
@@ -278,7 +390,7 @@ app.get("/api/grn", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.post("/api/grn", authMiddleware, checkRole(['super_admin', 'warehouse_manager', 'warehouse_staff']), async (c) => {
+app.post("/api/grn", authMiddleware, requirePermission('inventory.grn'), async (c) => {
   try {
     const body = await c.req.json();
     const validatedData = grnSchema.parse(body);
@@ -324,7 +436,7 @@ app.get("/api/grn/:id", authMiddleware, async (c) => {
   return c.json({ ...grn, items });
 });
 
-app.post("/api/grn/:id/post", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.post("/api/grn/:id/post", authMiddleware, requirePermission('inventory.grn'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const inventoryService = new InventoryService(c.env.DB);
@@ -337,7 +449,7 @@ app.post("/api/grn/:id/post", authMiddleware, checkRole(['super_admin', 'warehou
   }
 });
 
-app.post("/api/grn/:id/cancel", authMiddleware, checkRole(['super_admin']), async (c) => {
+app.post("/api/grn/:id/cancel", authMiddleware, requirePermission('inventory.grn'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const inventoryService = new InventoryService(c.env.DB);
@@ -358,7 +470,7 @@ app.get("/api/issues", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.post("/api/issues", authMiddleware, checkRole(['super_admin', 'warehouse_manager', 'warehouse_staff']), async (c) => {
+app.post("/api/issues", authMiddleware, requirePermission('inventory.issue'), async (c) => {
   const body = await c.req.json();
   const id = crypto.randomUUID();
   const user = c.get('jwtPayload') as any;
@@ -417,7 +529,7 @@ app.get("/api/issues/:id", authMiddleware, async (c) => {
   return c.json({ ...issue, items: itemsWithAllocations });
 });
 
-app.post("/api/issues/:id/post", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.post("/api/issues/:id/post", authMiddleware, requirePermission('inventory.issue'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const inventoryService = new InventoryService(c.env.DB);
@@ -448,7 +560,7 @@ app.get("/api/transfers", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.post("/api/transfers", authMiddleware, checkRole(['super_admin', 'warehouse_manager', 'warehouse_staff']), async (c) => {
+app.post("/api/transfers", authMiddleware, requirePermission('inventory.transfer'), async (c) => {
   const body = await c.req.json();
   const id = crypto.randomUUID();
   const user = c.get('jwtPayload') as any;
@@ -489,7 +601,7 @@ app.post("/api/transfers", authMiddleware, checkRole(['super_admin', 'warehouse_
   }
 });
 
-app.post("/api/transfers/:id/dispatch", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.post("/api/transfers/:id/dispatch", authMiddleware, requirePermission('inventory.transfer'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const inventoryService = new InventoryService(c.env.DB);
@@ -502,7 +614,7 @@ app.post("/api/transfers/:id/dispatch", authMiddleware, checkRole(['super_admin'
   }
 });
 
-app.post("/api/transfers/:id/receive", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.post("/api/transfers/:id/receive", authMiddleware, requirePermission('inventory.transfer'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const inventoryService = new InventoryService(c.env.DB);
@@ -523,7 +635,7 @@ app.get("/api/adjustments", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.post("/api/adjustments", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.post("/api/adjustments", authMiddleware, requirePermission('inventory.adjust'), async (c) => {
   const body = await c.req.json();
   const id = crypto.randomUUID();
   const user = c.get('jwtPayload') as any;
@@ -559,7 +671,7 @@ app.post("/api/adjustments", authMiddleware, checkRole(['super_admin', 'warehous
   }
 });
 
-app.post("/api/adjustments/:id/post", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.post("/api/adjustments/:id/post", authMiddleware, requirePermission('inventory.adjust'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const inventoryService = new InventoryService(c.env.DB);
@@ -702,7 +814,7 @@ app.get("/api/stock-counts", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.post("/api/stock-counts", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.post("/api/stock-counts", authMiddleware, requirePermission('inventory.count'), async (c) => {
   const { godown_id, remarks } = await c.req.json();
   const user = c.get('jwtPayload') as any;
   const service = new StockCountService(c.env.DB);
@@ -727,7 +839,7 @@ app.get("/api/stock-counts/:id", authMiddleware, async (c) => {
   return c.json({ ...session, items });
 });
 
-app.post("/api/stock-counts/:id/load-system-stock", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.post("/api/stock-counts/:id/load-system-stock", authMiddleware, requirePermission('inventory.count'), async (c) => {
   const id = c.req.param('id');
   const service = new StockCountService(c.env.DB);
   await service.loadSystemStock(id);
@@ -735,7 +847,7 @@ app.post("/api/stock-counts/:id/load-system-stock", authMiddleware, checkRole(['
   return c.json({ message: "System stock loaded" });
 });
 
-app.put("/api/stock-counts/items/:itemId", authMiddleware, checkRole(['super_admin', 'warehouse_manager', 'warehouse_staff']), async (c) => {
+app.put("/api/stock-counts/items/:itemId", authMiddleware, requirePermission('inventory.count'), async (c) => {
   const itemId = c.req.param('itemId');
   const { counted_quantity, entered_unit_id, remarks } = await c.req.json();
   const service = new StockCountService(c.env.DB);
@@ -753,7 +865,7 @@ app.post("/api/stock-counts/:id/submit", authMiddleware, async (c) => {
   return c.json({ message: "Session submitted" });
 });
 
-app.post("/api/stock-counts/:id/approve", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.post("/api/stock-counts/:id/approve", authMiddleware, requirePermission('inventory.count'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const service = new StockCountService(c.env.DB);
@@ -762,7 +874,7 @@ app.post("/api/stock-counts/:id/approve", authMiddleware, checkRole(['super_admi
   return c.json({ message: "Session approved" });
 });
 
-app.post("/api/stock-counts/:id/post", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.post("/api/stock-counts/:id/post", authMiddleware, requirePermission('inventory.count'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const service = new StockCountService(c.env.DB);
@@ -796,7 +908,7 @@ app.get("/api/wastage/analytics", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(analytics), 60);
 });
 
-app.post("/api/wastage", authMiddleware, checkRole(['super_admin', 'warehouse_manager', 'warehouse_staff']), async (c) => {
+app.post("/api/wastage", authMiddleware, requirePermission('inventory.wastage'), async (c) => {
   const body = await c.req.json();
   const user = c.get('jwtPayload') as any;
   const service = new WastageService(c.env.DB);
@@ -818,7 +930,7 @@ app.get("/api/wastage/:id", authMiddleware, async (c) => {
   return c.json({ ...record, items });
 });
 
-app.post("/api/wastage/:id/post", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.post("/api/wastage/:id/post", authMiddleware, requirePermission('inventory.wastage'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const service = new WastageService(c.env.DB);
@@ -900,7 +1012,7 @@ app.post("/api/requests/:id/submit", authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
-app.post("/api/requests/:id/approve", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.post("/api/requests/:id/approve", authMiddleware, requirePermission('inventory.issue'), async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json();
   const payload = c.get('jwtPayload') as any;
@@ -1084,7 +1196,7 @@ app.get("/api/batches/lookup-by-code", authMiddleware, rateLimiter, async (c) =>
   return c.json(batch || { message: "Batch not found" }, batch ? 200 : 404);
 });
 
-app.post("/api/items/:id/barcodes", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.post("/api/items/:id/barcodes", authMiddleware, requirePermission('inventory.view'), async (c) => {
   const itemId = c.req.param('id');
   const { barcode, type } = await c.req.json();
   const service = new BarcodeService(c.env.DB);
@@ -1100,7 +1212,7 @@ app.get("/api/items/:id/barcodes", authMiddleware, async (c) => {
   return c.json(results);
 });
 
-app.delete("/api/items/barcodes/:barcodeId", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.delete("/api/items/barcodes/:barcodeId", authMiddleware, requirePermission('inventory.view'), async (c) => {
   const barcodeId = c.req.param('barcodeId');
   const service = new BarcodeService(c.env.DB);
   await service.deleteBarcode(barcodeId);
@@ -1109,7 +1221,7 @@ app.delete("/api/items/barcodes/:barcodeId", authMiddleware, checkRole(['super_a
 });
 
 // --- Phase 4: Finance & Margin Tracking ---
-app.get("/api/finance/summary", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.get("/api/finance/summary", authMiddleware, requirePermission('finance.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const from = c.req.query('from');
@@ -1120,7 +1232,7 @@ app.get("/api/finance/summary", authMiddleware, checkRole(['super_admin', 'wareh
   return CacheManager.put(c, c.json(summary), 60);
 });
 
-app.get("/api/finance/margin/by-outlet", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.get("/api/finance/margin/by-outlet", authMiddleware, requirePermission('finance.view'), async (c) => {
   const cached = await CacheManager.get(c, 120);
   if (cached) return cached;
   const from = c.req.query('from');
@@ -1130,7 +1242,7 @@ app.get("/api/finance/margin/by-outlet", authMiddleware, checkRole(['super_admin
   return CacheManager.put(c, c.json(report), 120);
 });
 
-app.get("/api/finance/sales-trend", authMiddleware, checkRole(['super_admin', 'warehouse_manager']), async (c) => {
+app.get("/api/finance/sales-trend", authMiddleware, requirePermission('finance.view'), async (c) => {
   const cached = await CacheManager.get(c, 120);
   if (cached) return cached;
   const from = c.req.query('from');
