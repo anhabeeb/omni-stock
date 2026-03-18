@@ -154,8 +154,9 @@ export default function AnalyticsDashboard() {
         <StatCard 
           icon={DollarSign} 
           label="Expired Value" 
-          value={`$${summary?.expiredValue?.toLocaleString()}`} 
+          value={summary?.expiredValue || 0} 
           color="red" 
+          isCurrency
         />
       </div>
 
@@ -172,7 +173,7 @@ export default function AnalyticsDashboard() {
               <BarChart data={stockByGodown}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                 <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+                <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => format(v)} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
                   itemStyle={{ color: '#fff' }}

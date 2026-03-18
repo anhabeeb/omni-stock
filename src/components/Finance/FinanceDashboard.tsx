@@ -210,16 +210,16 @@ export default function FinanceDashboard() {
                     <p className="text-sm font-bold text-white">{row.outletName}</p>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <p className="text-sm font-medium text-white">${row.revenue.toLocaleString()}</p>
+                    <p className="text-sm font-medium text-white">{format(row.revenue)}</p>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <p className="text-sm font-medium text-slate-400">${row.cogs.toLocaleString()}</p>
+                    <p className="text-sm font-medium text-slate-400">{format(row.cogs)}</p>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <p className="text-sm font-medium text-rose-400">${(row.wastageLoss || 0).toLocaleString()}</p>
+                    <p className="text-sm font-medium text-rose-400">{format(row.wastageLoss || 0)}</p>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <p className="text-sm font-bold text-emerald-500">${(row.netProfit || row.grossProfit).toLocaleString()}</p>
+                    <p className="text-sm font-bold text-emerald-500">{format(row.netProfit || row.grossProfit)}</p>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/10 text-blue-500 rounded-full text-xs font-bold">

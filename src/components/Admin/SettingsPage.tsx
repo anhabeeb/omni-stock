@@ -19,11 +19,29 @@ import { useSettings } from '../../contexts/SettingsContext';
 import { cn } from '../../utils/cn';
 
 export default function SettingsPage() {
-  const { settings, updateSettings, theme, setTheme, isLoading } = useSettings();
+  const { settings, updateSettings, theme, setTheme, isLoading, error } = useSettings();
   const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
 
-  if (isLoading || !settings) return <div>Loading settings...</div>;
+  if (isLoading) {
+    return <div className="p-6 text-slate-400">Loading settings...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 rounded-2xl border border-red-500/20 bg-red-500/5 text-red-300">
+        {error}
+      </div>
+    );
+  }
+
+  if (!settings) {
+    return (
+      <div className="p-6 rounded-2xl border border-amber-500/20 bg-amber-500/5 text-amber-300">
+        No settings available.
+      </div>
+    );
+  }
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -31,23 +49,37 @@ export default function SettingsPage() {
     const formData = new FormData(e.currentTarget);
     const data: any = {};
     
-    // Process form data, converting numeric strings to numbers
+    const numericFields = [
+      'decimal_places',
+      'expiry_warning_threshold_days',
+      'low_stock_threshold_percent',
+      'notification_threshold_high'
+    ];
+
+    const checkboxFields = [
+      'allow_negative_stock',
+      'default_fefo_behavior',
+      'stock_count_approval_required',
+      'wastage_approval_required',
+      'dark_mode_enabled',
+      'light_mode_enabled',
+      'user_theme_override_allowed',
+      'enable_expiry_alerts',
+      'enable_low_stock_alerts',
+      'enable_wastage_alerts'
+    ];
+
     for (const [key, value] of formData.entries()) {
-      if (['decimal_places', 'allow_negative_stock', 'default_fefo_behavior', 'expiry_warning_threshold_days', 
-           'low_stock_threshold_percent', 'stock_count_approval_required', 'wastage_approval_required',
-           'dark_mode_enabled', 'light_mode_enabled', 'user_theme_override_allowed',
-           'notification_threshold_high', 'enable_expiry_alerts', 'enable_low_stock_alerts', 'enable_wastage_alerts'].includes(key)) {
-        data[key] = value === 'on' ? 1 : parseInt(value as string);
+      if (checkboxFields.includes(key)) {
+        data[key] = value === 'on' ? 1 : 0;
+      } else if (numericFields.includes(key)) {
+        data[key] = Number(value);
       } else {
         data[key] = value;
       }
     }
 
-    // Handle checkboxes that are not in formData if unchecked
-    const checkboxes = ['allow_negative_stock', 'default_fefo_behavior', 'stock_count_approval_required', 'wastage_approval_required',
-                        'dark_mode_enabled', 'light_mode_enabled', 'user_theme_override_allowed',
-                        'enable_expiry_alerts', 'enable_low_stock_alerts', 'enable_wastage_alerts'];
-    checkboxes.forEach(cb => {
+    checkboxFields.forEach((cb) => {
       if (!formData.has(cb)) data[cb] = 0;
     });
 

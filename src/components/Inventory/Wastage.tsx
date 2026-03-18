@@ -244,8 +244,8 @@ export default function Wastage() {
                   <td className="px-6 py-4 text-sm text-white font-medium">{item.item_name}</td>
                   <td className="px-6 py-4 text-sm text-slate-400 font-mono">{item.batch_number || 'N/A'}</td>
                   <td className="px-6 py-4 text-sm text-white text-right font-mono">{item.quantity}</td>
-                  <td className="px-6 py-4 text-sm text-slate-400 text-right font-mono">${item.unit_cost?.toLocaleString()}</td>
-                  <td className="px-6 py-4 text-sm text-rose-400 text-right font-mono font-bold">${item.total_cost?.toLocaleString()}</td>
+                  <td className="px-6 py-4 text-sm text-slate-400 text-right font-mono">{format(item.unit_cost || 0)}</td>
+                  <td className="px-6 py-4 text-sm text-rose-400 text-right font-mono font-bold">{format(item.total_cost || 0)}</td>
                   <td className="px-6 py-4 text-sm text-slate-400">{item.reason_detail || '-'}</td>
                 </tr>
               ))}

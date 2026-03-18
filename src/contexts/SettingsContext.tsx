@@ -29,34 +29,69 @@ interface SettingsContextType {
   setTheme: (theme: 'dark' | 'light') => void;
   format: (amount: number) => string;
   isLoading: boolean;
+  error: string | null;
   updateSettings: (newSettings: Partial<Settings>) => Promise<void>;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
+const defaultSettings: Settings = {
+  system_name: 'OmniStock',
+  company_name: '',
+  default_currency: 'MVR',
+  currency_symbol: 'MVR',
+  currency_position: 'before',
+  decimal_places: 2,
+  date_format: 'YYYY-MM-DD',
+  timezone: 'Asia/Male',
+  dark_mode_enabled: 1,
+  light_mode_enabled: 1,
+  default_theme: 'dark',
+  user_theme_override_allowed: 1,
+  allow_negative_stock: 0,
+  default_fefo_behavior: 1,
+  expiry_warning_threshold_days: 30,
+  low_stock_threshold_percent: 10,
+  stock_count_approval_required: 1,
+  wastage_approval_required: 1,
+  notification_threshold_high: 20,
+  enable_expiry_alerts: 1,
+  enable_low_stock_alerts: 1,
+  enable_wastage_alerts: 1,
+};
+
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const queryClient = useQueryClient();
   const [theme, setThemeState] = useState<'dark' | 'light'>('dark');
+  const token = localStorage.getItem('token');
 
-  const { data: settings, isLoading } = useQuery<Settings>({
+  const { data, isLoading, error } = useQuery<Settings>({
     queryKey: ['settings'],
     queryFn: async () => {
       const res = await fetch('/api/settings', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        headers: { Authorization: `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error('Failed to fetch settings');
-      return res.json();
+      if (!res.ok) throw new Error(`Failed to fetch settings (${res.status})`);
+      const json = await res.json() as Partial<Settings>;
+      return { ...defaultSettings, ...json };
     },
-    enabled: !!localStorage.getItem('token'),
+    enabled: !!token,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
   });
+
+  const settings = token ? (data ?? null) : null;
 
   useEffect(() => {
     if (settings) {
       const savedTheme = localStorage.getItem('theme') as 'dark' | 'light';
-      if (savedTheme && settings.user_theme_override_allowed) {
+      if (savedTheme && settings.user_theme_override_allowed && 
+          ((savedTheme === 'dark' && settings.dark_mode_enabled) || 
+           (savedTheme === 'light' && settings.light_mode_enabled))) {
         setThemeState(savedTheme);
       } else {
-        setThemeState(settings.default_theme as 'dark' | 'light');
+        const defaultTheme = settings.default_theme === 'light' && settings.light_mode_enabled ? 'light' : 'dark';
+        setThemeState(defaultTheme);
       }
     }
   }, [settings]);
@@ -68,13 +103,16 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [theme]);
 
   const setTheme = (newTheme: 'dark' | 'light') => {
+    if (!settings) return;
+    if (newTheme === 'dark' && !settings.dark_mode_enabled) return;
+    if (newTheme === 'light' && !settings.light_mode_enabled) return;
+
     setThemeState(newTheme);
     localStorage.setItem('theme', newTheme);
   };
 
   const format = (amount: number) => {
-    if (!settings) return amount.toString();
-    return formatCurrency(amount, settings);
+    return formatCurrency(amount, settings || defaultSettings);
   };
 
   const updateMutation = useMutation({
@@ -87,7 +125,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         },
         body: JSON.stringify(newSettings),
       });
-      if (!res.ok) throw new Error('Failed to update settings');
+      if (!res.ok) throw new Error(`Failed to update settings (${res.status})`);
+      return res.json().catch(() => null);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
@@ -96,11 +135,12 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   return (
     <SettingsContext.Provider value={{ 
-      settings: settings || null, 
+      settings, 
       theme, 
       setTheme, 
       format, 
       isLoading,
+      error: error ? (error as Error).message : null,
       updateSettings: updateMutation.mutateAsync
     }}>
       {children}
