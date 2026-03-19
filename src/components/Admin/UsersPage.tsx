@@ -251,7 +251,10 @@ export default function UsersPage() {
   const [managingUser, setManagingUser] = useState<User | null>(null);
 
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const hasPermission = (p: string) => 
+    currentUser.role === 'super_admin' || 
+    currentUser.role === 'role_super_admin' || 
+    currentUser.permissions?.includes(p);
 
   const canView = hasPermission('users.view');
 

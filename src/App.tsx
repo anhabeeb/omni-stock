@@ -129,7 +129,7 @@ const PermissionGate = ({
   user: User,
   fallback?: React.ReactNode
 }) => {
-  const hasPermission = user.role === 'super_admin' || user.permissions.includes(permission);
+  const hasPermission = user.role === 'super_admin' || user.role === 'role_super_admin' || (user.permissions && user.permissions.includes(permission));
   if (!hasPermission) return <>{fallback}</>;
   return <>{children}</>;
 };
@@ -462,8 +462,8 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
 // --- Pages ---
 
 const LoginPage = ({ onLogin }: { onLogin: (user: User, token: string) => void }) => {
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("omnistock123");
+  const [username, setUsername] = useState("superadmin");
+  const [password, setPassword] = useState("superadmin123");
   const [loading, setLoading] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [setupMessage, setSetupMessage] = useState("");

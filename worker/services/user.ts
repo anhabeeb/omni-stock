@@ -32,6 +32,9 @@ export class UserService {
   }
 
   async getUsers(filters?: { role_id?: string; is_active?: number; search?: string }): Promise<User[]> {
+    // Fix legacy roles if any
+    await this.fixLegacyRoles();
+
     let query = `
       SELECT u.*, r.name as role_name 
       FROM users u 

@@ -156,7 +156,7 @@ const requirePermission = (permission: string) => async (c: Context<{ Bindings: 
   const user = c.get('user') as any;
   
   // Super admin bypass
-  if (user.role_name === 'super_admin' || permissions.includes(permission)) {
+  if (user.role_name === 'super_admin' || user.role_id === 'role_super_admin' || permissions.includes(permission)) {
     await next();
   } else {
     return c.json({ message: `Forbidden: Missing permission ${permission}` }, 403);
@@ -206,7 +206,7 @@ app.post("/api/auth/login", rateLimiter, async (c) => {
   const token = await sign({ 
     id: user.id, 
     username: user.username, 
-    role: user.role_name,
+    role: user.role_name || user.role_id,
     fullName: user.full_name,
     exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24 hours
   }, secret);
@@ -236,6 +236,10 @@ app.get("/api/settings/public", async (c) => {
 app.get("/api/setup/status", async (c) => {
   const setupService = new SetupService(c.env.DB);
   const status = await setupService.getBootstrapStatus();
+  if (status.is_initialized) {
+    // Run RBAC repair in background to ensure data integrity
+    c.executionCtx.waitUntil(setupService.repairRBAC());
+  }
   return c.json(status);
 });
 

@@ -433,9 +433,10 @@ export class SetupService {
       await this.db.prepare(`INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
         SELECT 'role_super_admin', id FROM permissions`).run();
 
-      // Admin = all permissions
+      // Admin = broad access but restricted platform management
       await this.db.prepare(`INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
-        SELECT 'role_admin', id FROM permissions`).run();
+        SELECT 'role_admin', id FROM permissions 
+        WHERE key NOT IN ('users.permissions.manage', 'settings.update', 'onboarding.reset')`).run();
 
       // Warehouse Manager
       await this.db.prepare(`INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
@@ -475,12 +476,90 @@ export class SetupService {
         VALUES ('00000000-0000-0000-0000-000000000001', 'admin', 'admin@omnistock.com', 'e22d2a64f93df13c3560a0420e926529006adc85d12b24735fced9e5d13664b6', 'System Admin', 'role_super_admin', 1)`).run();
 
       // Seed Bootstrap
-      await this.db.prepare("INSERT OR IGNORE INTO system_bootstrap (id, is_initialized) VALUES ('main', 0)").run();
+      await this.db.prepare("INSERT OR REPLACE INTO system_bootstrap (id, is_initialized, initialized_at) VALUES ('main', 1, CURRENT_TIMESTAMP)").run();
 
       return { success: true, message: "Database initialized successfully" };
     } catch (e: any) {
       console.error("Initialization failed:", e);
       return { success: false, message: e.message };
+    }
+  }
+
+  async repairRBAC(): Promise<void> {
+    console.log("Running RBAC repair...");
+    try {
+      // 1. Ensure all new roles exist
+      await this.db.batch([
+        this.db.prepare("INSERT OR IGNORE INTO roles (id, name, description) VALUES ('role_super_admin', 'super_admin', 'Full system access')"),
+        this.db.prepare("INSERT OR IGNORE INTO roles (id, name, description) VALUES ('role_admin', 'admin', 'Administrative access with some restrictions')"),
+        this.db.prepare("INSERT OR IGNORE INTO roles (id, name, description) VALUES ('role_warehouse_manager', 'warehouse_manager', 'Warehouse management and approvals')"),
+        this.db.prepare("INSERT OR IGNORE INTO roles (id, name, description) VALUES ('role_warehouse_staff', 'warehouse_staff', 'Daily warehouse operations')")
+      ]);
+
+      // 2. Map legacy roles
+      await this.db.batch([
+        this.db.prepare("UPDATE users SET role_id = 'role_super_admin' WHERE role_id = '1' OR role_id = 1"),
+        this.db.prepare("UPDATE users SET role_id = 'role_admin' WHERE role_id = '2' OR role_id = 2"),
+        this.db.prepare("UPDATE users SET role_id = 'role_warehouse_manager' WHERE role_id = '3' OR role_id = 3"),
+        this.db.prepare("UPDATE users SET role_id = 'role_warehouse_staff' WHERE role_id = '4' OR role_id = 4")
+      ]);
+
+      // 3. Ensure superadmin user has correct role
+      await this.db.prepare("UPDATE users SET role_id = 'role_super_admin' WHERE username = 'superadmin' OR username = 'admin'").run();
+
+      // 4. Ensure permissions exist
+      const permissions = [
+        ['perm_users_view', 'users.view', 'View users list'],
+        ['perm_users_create', 'users.create', 'Create new users'],
+        ['perm_users_update', 'users.update', 'Update existing users'],
+        ['perm_users_deactivate', 'users.deactivate', 'Deactivate/Reactivate users'],
+        ['perm_users_permissions_manage', 'users.permissions.manage', 'Manage individual user permissions'],
+        ['perm_inventory_view', 'inventory.view', 'View inventory'],
+        ['perm_inventory_manage', 'inventory.manage', 'Manage inventory items'],
+        ['perm_stock_issue', 'stock.issue', 'Issue stock'],
+        ['perm_stock_receive', 'stock.receive', 'Receive stock (GRN)'],
+        ['perm_stock_transfer', 'stock.transfer', 'Transfer stock between godowns'],
+        ['perm_stock_count', 'stock.count', 'Perform stock counts'],
+        ['perm_stock_wastage', 'stock.wastage', 'Record stock wastage'],
+        ['perm_godowns_manage', 'godowns.manage', 'Manage godowns'],
+        ['perm_suppliers_manage', 'suppliers.manage', 'Manage suppliers'],
+        ['perm_categories_manage', 'categories.manage', 'Manage item categories'],
+        ['perm_reports_view', 'reports.view', 'View reports'],
+        ['perm_settings_update', 'settings.update', 'Update system settings'],
+        ['perm_onboarding_reset', 'onboarding.reset', 'Reset user tutorials']
+      ];
+
+      for (const [id, key, desc] of permissions) {
+        await this.db.prepare("INSERT OR IGNORE INTO permissions (id, key, description) VALUES (?, ?, ?)").bind(id, key, desc).run();
+      }
+
+      // 5. Re-seed role_permissions (non-destructively)
+      await this.db.batch([
+        // Super Admin
+        this.db.prepare("INSERT OR IGNORE INTO role_permissions (role_id, permission_id) SELECT 'role_super_admin', id FROM permissions"),
+        // Admin (restricted)
+        this.db.prepare(`
+          INSERT OR IGNORE INTO role_permissions (role_id, permission_id) 
+          SELECT 'role_admin', id FROM permissions 
+          WHERE key NOT IN ('users.permissions.manage', 'settings.update', 'onboarding.reset')
+        `),
+        // Manager
+        this.db.prepare(`
+          INSERT OR IGNORE INTO role_permissions (role_id, permission_id) 
+          SELECT 'role_warehouse_manager', id FROM permissions 
+          WHERE key IN ('inventory.view', 'inventory.manage', 'stock.issue', 'stock.receive', 'stock.transfer', 'stock.count', 'stock.wastage', 'reports.view', 'suppliers.manage', 'categories.manage')
+        `),
+        // Staff
+        this.db.prepare(`
+          INSERT OR IGNORE INTO role_permissions (role_id, permission_id) 
+          SELECT 'role_warehouse_staff', id FROM permissions 
+          WHERE key IN ('inventory.view', 'stock.issue', 'stock.receive', 'stock.transfer', 'stock.count', 'stock.wastage')
+        `)
+      ]);
+
+      console.log("RBAC repair completed successfully.");
+    } catch (e) {
+      console.error("RBAC repair failed:", e);
     }
   }
 }
