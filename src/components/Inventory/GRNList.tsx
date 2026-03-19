@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
 import { Plus, Search, FileText, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
+import DocumentPrintModal from '../Common/DocumentPrintModal';
 
 const GRNList: React.FC = () => {
   const [search, setSearch] = useState("");
+  const [printDoc, setPrintDoc] = useState<any>(null);
 
   const { data: grns = [], isLoading: loading } = useQuery<any[]>({
     queryKey: ['grns'],
@@ -33,28 +38,54 @@ const GRNList: React.FC = () => {
     }
   };
 
+  const exportColumns = [
+    { header: 'GRN Number', key: 'grn_number' },
+    { header: 'Supplier', key: 'supplier_id' },
+    { header: 'Received Date', key: 'received_date' },
+    { header: 'Godown', key: 'godown_id' },
+    { header: 'Status', key: 'status' }
+  ];
+
+  const handlePrintDoc = async (grn: any) => {
+    try {
+      const response = await fetch(`/api/grn/${grn.id}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!response.ok) throw new Error('Failed to fetch GRN details');
+      const details = await response.json();
+      setPrintDoc(details);
+    } catch (error) {
+      console.error("Failed to load GRN details for printing", error);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <PrintHeader title="Goods Receipts (GRN)" filters={search ? `Search: ${search}` : undefined} />
+      <div className="flex justify-between items-center no-print">
         <div>
-          <h1 className="text-2xl font-bold text-white">Goods Receipts (GRN)</h1>
-          <p className="text-slate-400">Manage incoming stock from suppliers</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Goods Receipts (GRN)</h1>
+          <p className="text-gray-500 dark:text-slate-400">Manage incoming stock from suppliers</p>
         </div>
-        <button className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg flex items-center gap-2 transition-colors">
-          <Plus size={20} /> New GRN
-        </button>
+        <div className="flex items-center gap-3">
+          <ExportButton data={filtered} filename="grn-list" columns={exportColumns} />
+          <PrintButton />
+          <button className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg flex items-center gap-2 transition-colors">
+            <Plus size={20} /> New GRN
+          </button>
+        </div>
       </div>
 
-      <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-        <div className="p-4 border-b border-slate-800 flex items-center gap-4 bg-slate-900/50">
+      <div className="bg-white dark:bg-slate-900/50 border border-gray-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xl">
+        <div className="p-4 border-b border-gray-200 dark:border-slate-800 flex items-center gap-4 bg-gray-50 dark:bg-slate-900/50 no-print">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" size={18} />
             <input 
               type="text" 
               placeholder="Search GRN number, supplier..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-gray-900 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-emerald-500/50 transition-all placeholder:text-gray-400 dark:placeholder:text-slate-500"
             />
           </div>
         </div>
@@ -68,7 +99,7 @@ const GRNList: React.FC = () => {
                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Received Date</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Godown</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Actions</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right no-print">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
@@ -87,8 +118,12 @@ const GRNList: React.FC = () => {
                   <td className="px-6 py-4 text-slate-400">{new Date(grn.received_date).toLocaleDateString()}</td>
                   <td className="px-6 py-4 text-slate-400">{grn.godown_id}</td>
                   <td className="px-6 py-4">{getStatusBadge(grn.status)}</td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors">
+                  <td className="px-6 py-4 text-right no-print">
+                    <button 
+                      onClick={() => handlePrintDoc(grn)}
+                      className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
+                      title="Print Document"
+                    >
                       <FileText size={18} />
                     </button>
                   </td>
@@ -98,6 +133,34 @@ const GRNList: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {printDoc && (
+        <DocumentPrintModal
+          isOpen={!!printDoc}
+          onClose={() => setPrintDoc(null)}
+          title="Goods Receipt Note"
+          documentNumber={printDoc.grn_number}
+          date={printDoc.received_date}
+          status={printDoc.status}
+          details={[
+            { label: 'Supplier', value: printDoc.supplier_id },
+            { label: 'Godown', value: printDoc.godown_id },
+            { label: 'Remarks', value: printDoc.remarks || 'N/A' },
+          ]}
+          items={printDoc.items || []}
+          itemColumns={[
+            { header: 'Item', key: 'item_id' },
+            { header: 'Batch', key: 'batch_number' },
+            { header: 'Expiry', key: 'expiry_date' },
+            { header: 'Qty', key: 'entered_quantity', align: 'right' },
+            { header: 'Unit Cost', key: 'unit_cost', isCurrency: true, align: 'right' },
+            { header: 'Total', key: 'total_line_cost', isCurrency: true, align: 'right' },
+          ]}
+          totals={[
+            { label: 'Total Amount', value: printDoc.items?.reduce((sum: number, item: any) => sum + (item.total_line_cost || 0), 0) || 0, isCurrency: true }
+          ]}
+        />
+      )}
     </div>
   );
 };

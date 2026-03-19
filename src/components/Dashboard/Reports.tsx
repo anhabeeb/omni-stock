@@ -7,6 +7,9 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSettings } from '../../contexts/SettingsContext';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
 
 type ReportType = 'stock' | 'movements' | 'valuation' | 'wastage' | 'expiry';
 
@@ -69,48 +72,77 @@ export default function Reports() {
     fetchReport();
   }, [activeReport, filters.godownId, filters.categoryId, filters.groupBy]);
 
-  const exportToCSV = () => {
-    if (data.length === 0) return;
-    const headers = Object.keys(data[0]).join(',');
-    const rows = data.map(row => 
-      Object.values(row).map(val => `"${val}"`).join(',')
-    ).join('\n');
-    const csvContent = `data:text/csv;charset=utf-8,${headers}\n${rows}`;
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `${activeReport}_report_${new Date().toISOString()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const getExportColumns = () => {
+    switch(activeReport) {
+      case 'stock': return [
+        { header: 'Item', key: 'item_name' },
+        { header: 'SKU', key: 'item_sku' },
+        { header: 'Godown', key: 'godown_name' },
+        { header: 'Category', key: 'category_name' },
+        { header: 'Quantity', key: 'quantity_on_hand' },
+        { header: 'Value', key: (row: any) => row.quantity_on_hand * row.average_unit_cost }
+      ];
+      case 'movements': return [
+        { header: 'Date', key: 'movement_date' },
+        { header: 'Type', key: 'movement_type' },
+        { header: 'Item', key: 'item_name' },
+        { header: 'Godown', key: 'godown_name' },
+        { header: 'Quantity', key: 'base_quantity' }
+      ];
+      case 'valuation': return [
+        { header: 'Group', key: 'group_name' },
+        { header: 'Total Value', key: 'total_value' }
+      ];
+      case 'wastage': return [
+        { header: 'Date', key: 'wastage_date' },
+        { header: 'Number', key: 'wastage_number' },
+        { header: 'Godown', key: 'godown_name' },
+        { header: 'Reason', key: 'reason' },
+        { header: 'Status', key: 'status' }
+      ];
+      case 'expiry': return [
+        { header: 'Item', key: 'item_name' },
+        { header: 'Batch', key: 'batch_number' },
+        { header: 'Expiry', key: 'expiry_date' },
+        { header: 'Quantity', key: 'current_quantity' }
+      ];
+      default: return [];
+    }
+  };
+
+  const getReportTitle = () => {
+    switch(activeReport) {
+      case 'stock': return 'Current Stock Report';
+      case 'movements': return 'Stock Movements Report';
+      case 'valuation': return 'Inventory Valuation Report';
+      case 'wastage': return 'Wastage Report';
+      case 'expiry': return 'Expiry Alerts Report';
+      default: return 'Report';
+    }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <PrintHeader title={getReportTitle()} />
+      <div className="flex items-center justify-between no-print">
         <div>
-          <h2 className="text-2xl font-bold text-white tracking-tight">Advanced Reporting</h2>
-          <p className="text-slate-400 text-sm mt-1">Generate and export detailed warehouse insights.</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Advanced Reporting</h2>
+          <p className="text-gray-500 dark:text-slate-400 text-sm mt-1">Generate and export detailed warehouse insights.</p>
         </div>
         <div className="flex gap-3">
           <button 
             onClick={fetchReport}
-            className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 border border-slate-800 transition-colors"
+            className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl text-slate-500 dark:text-slate-400 border border-slate-300 dark:border-slate-800 transition-colors"
           >
             <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
           </button>
-          <button 
-            onClick={exportToCSV}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2"
-          >
-            <Download size={18} />
-            <span>Export CSV</span>
-          </button>
+          <ExportButton data={data} filename={`${activeReport}-report`} columns={getExportColumns()} />
+          <PrintButton />
         </div>
       </div>
 
       {/* Report Type Tabs */}
-      <div className="flex gap-2 p-1 bg-slate-900/50 border border-slate-800 rounded-2xl overflow-x-auto custom-scrollbar">
+      <div className="flex gap-2 p-1 bg-gray-100 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-800 rounded-2xl overflow-x-auto custom-scrollbar no-print">
         {[
           { id: 'stock', label: 'Current Stock', icon: TableIcon },
           { id: 'movements', label: 'Movements', icon: RefreshCw },
@@ -124,7 +156,7 @@ export default function Reports() {
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
               activeReport === tab.id 
                 ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/20" 
-                : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                : "text-gray-500 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white"
             }`}
           >
             <tab.icon size={16} />
@@ -134,24 +166,24 @@ export default function Reports() {
       </div>
 
       {/* Filters Bar */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-900 border border-slate-800 p-4 rounded-3xl">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 p-4 rounded-3xl no-print">
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Godown</label>
+          <label className="text-[10px] font-bold text-gray-500 dark:text-slate-500 uppercase tracking-widest px-1">Godown</label>
           <select 
             value={filters.godownId}
             onChange={(e) => setFilters({...filters, godownId: e.target.value})}
-            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
           >
             <option value="">All Godowns</option>
             {godowns.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
         </div>
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Category</label>
+          <label className="text-[10px] font-bold text-gray-500 dark:text-slate-500 uppercase tracking-widest px-1">Category</label>
           <select 
             value={filters.categoryId}
             onChange={(e) => setFilters({...filters, categoryId: e.target.value})}
-            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
           >
             <option value="">All Categories</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -160,32 +192,32 @@ export default function Reports() {
         {activeReport === 'movements' && (
           <>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">From</label>
+              <label className="text-[10px] font-bold text-gray-500 dark:text-slate-500 uppercase tracking-widest px-1">From</label>
               <input 
                 type="date"
                 value={filters.from}
                 onChange={(e) => setFilters({...filters, from: e.target.value})}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">To</label>
+              <label className="text-[10px] font-bold text-gray-500 dark:text-slate-500 uppercase tracking-widest px-1">To</label>
               <input 
                 type="date"
                 value={filters.to}
                 onChange={(e) => setFilters({...filters, to: e.target.value})}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
           </>
         )}
         {activeReport === 'valuation' && (
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Group By</label>
+            <label className="text-[10px] font-bold text-gray-500 dark:text-slate-500 uppercase tracking-widest px-1">Group By</label>
             <select 
               value={filters.groupBy}
               onChange={(e) => setFilters({...filters, groupBy: e.target.value})}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500"
             >
               <option value="item">Item</option>
               <option value="godown">Godown</option>
@@ -196,65 +228,65 @@ export default function Reports() {
       </div>
 
       {/* Data Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
+      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-800/50">
+              <tr className="bg-gray-50 dark:bg-slate-800/50 border-b border-gray-200 dark:border-slate-800">
                 {activeReport === 'stock' && (
                   <>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Item</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Godown</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Category</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right">Qty</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right">Value</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Item</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Godown</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Category</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider text-right">Qty</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider text-right">Value</th>
                   </>
                 )}
                 {activeReport === 'movements' && (
                   <>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Type</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Item</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Godown</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right">Qty</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Item</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Godown</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider text-right">Qty</th>
                   </>
                 )}
                 {activeReport === 'valuation' && (
                   <>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Group</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right">Total Value</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Group</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider text-right">Total Value</th>
                   </>
                 )}
                 {activeReport === 'wastage' && (
                   <>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Number</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Godown</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Reason</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Number</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Godown</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Reason</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
                   </>
                 )}
                 {activeReport === 'expiry' && (
                   <>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Item</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Batch</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Expiry</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right">Qty</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Item</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Batch</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Expiry</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider text-right">Qty</th>
                   </>
                 )}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className="divide-y divide-gray-200 dark:divide-slate-800">
               <AnimatePresence mode="wait">
                 {loading ? (
                   [1,2,3,4,5].map(i => (
                     <tr key={i} className="animate-pulse">
-                      <td colSpan={6} className="px-6 py-4"><div className="h-4 bg-slate-800 rounded w-full" /></td>
+                      <td colSpan={6} className="px-6 py-4"><div className="h-4 bg-gray-200 dark:bg-slate-800 rounded w-full" /></td>
                     </tr>
                   ))
                 ) : data.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500 font-medium">No data found for the selected filters.</td>
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-slate-500 font-medium">No data found for the selected filters.</td>
                   </tr>
                 ) : data.map((row, i) => (
                   <motion.tr 
@@ -262,49 +294,49 @@ export default function Reports() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: i * 0.02 }}
-                    className="hover:bg-slate-800/30 transition-colors"
+                    className="hover:bg-gray-50 dark:hover:bg-slate-800/30 transition-colors"
                   >
                     {activeReport === 'stock' && (
                       <>
-                        <td className="px-6 py-4 text-sm text-white font-medium">{row.item_name} <span className="text-slate-500 text-xs ml-1">{row.item_sku}</span></td>
-                        <td className="px-6 py-4 text-sm text-slate-400">{row.godown_name}</td>
-                        <td className="px-6 py-4 text-sm text-slate-400">{row.category_name}</td>
-                        <td className="px-6 py-4 text-sm text-white text-right font-mono">{row.quantity_on_hand}</td>
-                        <td className="px-6 py-4 text-sm text-emerald-400 text-right font-mono">{format(row.quantity_on_hand * row.average_unit_cost)}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-medium">{row.item_name} <span className="text-gray-500 dark:text-slate-500 text-xs ml-1">{row.item_sku}</span></td>
+                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-slate-400">{row.godown_name}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-slate-400">{row.category_name}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-right font-mono">{row.quantity_on_hand}</td>
+                        <td className="px-6 py-4 text-sm text-emerald-600 dark:text-emerald-400 text-right font-mono">{format(row.quantity_on_hand * row.average_unit_cost)}</td>
                       </>
                     )}
                     {activeReport === 'movements' && (
                       <>
-                        <td className="px-6 py-4 text-sm text-slate-400">{new Date(row.movement_date).toLocaleDateString()}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-slate-400">{new Date(row.movement_date).toLocaleDateString()}</td>
                         <td className="px-6 py-4 text-sm">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                            row.base_quantity > 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
+                            row.base_quantity > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-500' : 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-500'
                           }`}>
                             {row.movement_type.replace('_', ' ')}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-white font-medium">{row.item_name}</td>
-                        <td className="px-6 py-4 text-sm text-slate-400">{row.godown_name}</td>
-                        <td className={`px-6 py-4 text-sm text-right font-mono font-bold ${row.base_quantity > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-medium">{row.item_name}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-slate-400">{row.godown_name}</td>
+                        <td className={`px-6 py-4 text-sm text-right font-mono font-bold ${row.base_quantity > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                           {row.base_quantity > 0 ? `+${row.base_quantity}` : row.base_quantity}
                         </td>
                       </>
                     )}
                     {activeReport === 'valuation' && (
                       <>
-                        <td className="px-6 py-4 text-sm text-white font-medium">{row.group_name}</td>
-                        <td className="px-6 py-4 text-sm text-emerald-400 text-right font-mono font-bold">{format(row.total_value)}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-medium">{row.group_name}</td>
+                        <td className="px-6 py-4 text-sm text-emerald-600 dark:text-emerald-400 text-right font-mono font-bold">{format(row.total_value)}</td>
                       </>
                     )}
                     {activeReport === 'wastage' && (
                       <>
-                        <td className="px-6 py-4 text-sm text-slate-400">{new Date(row.wastage_date).toLocaleDateString()}</td>
-                        <td className="px-6 py-4 text-sm text-white font-medium">{row.wastage_number}</td>
-                        <td className="px-6 py-4 text-sm text-slate-400">{row.godown_name}</td>
-                        <td className="px-6 py-4 text-sm text-slate-400">{row.reason}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-slate-400">{new Date(row.wastage_date).toLocaleDateString()}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-medium">{row.wastage_number}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-slate-400">{row.godown_name}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-slate-400">{row.reason}</td>
                         <td className="px-6 py-4 text-sm">
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                            row.status === 'posted' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-500/10 text-slate-500'
+                            row.status === 'posted' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-500' : 'bg-gray-100 text-gray-700 dark:bg-slate-500/10 dark:text-slate-500'
                           }`}>
                             {row.status}
                           </span>
@@ -313,10 +345,10 @@ export default function Reports() {
                     )}
                     {activeReport === 'expiry' && (
                       <>
-                        <td className="px-6 py-4 text-sm text-white font-medium">{row.item_name}</td>
-                        <td className="px-6 py-4 text-sm text-slate-400 font-mono">{row.batch_number}</td>
-                        <td className="px-6 py-4 text-sm text-rose-400 font-medium">{new Date(row.expiry_date).toLocaleDateString()}</td>
-                        <td className="px-6 py-4 text-sm text-white text-right font-mono">{row.current_quantity}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-medium">{row.item_name}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-slate-400 font-mono">{row.batch_number}</td>
+                        <td className="px-6 py-4 text-sm text-rose-600 dark:text-rose-400 font-medium">{new Date(row.expiry_date).toLocaleDateString()}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white text-right font-mono">{row.current_quantity}</td>
                       </>
                     )}
                   </motion.tr>

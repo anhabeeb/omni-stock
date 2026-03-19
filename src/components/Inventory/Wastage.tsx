@@ -4,17 +4,22 @@ import {
   Trash2, Plus, Search, Filter, 
   ChevronRight, CheckCircle2, XCircle, 
   Clock, AlertCircle, Save, Send, Check, Trash,
-  ShieldAlert, Tag, Layers
+  ShieldAlert, Tag, Layers, Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AttachmentManager } from '../Common/AttachmentManager';
 import { useSettings } from '../../contexts/SettingsContext';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
+import DocumentPrintModal from '../Common/DocumentPrintModal';
 
 export default function Wastage() {
   const queryClient = useQueryClient();
   const { format } = useSettings();
   const [activeRecordId, setActiveRecordId] = useState<string | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [printDoc, setPrintDoc] = useState<any>(null);
   const [newRecord, setNewRecord] = useState({
     godown_id: '',
     wastage_date: new Date().toISOString().split('T')[0],
@@ -35,6 +40,20 @@ export default function Wastage() {
       return res.json();
     }
   });
+
+  const handlePrintDoc = async (record: any) => {
+    try {
+      const res = await fetch(`/api/wastage/${record.id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch wastage details');
+      const data = await res.json();
+      setPrintDoc(data);
+    } catch (error) {
+      console.error('Error fetching wastage details:', error);
+      alert('Failed to load wastage details for printing.');
+    }
+  };
 
   const { data: godowns = [] } = useQuery<any[]>({
     queryKey: ["master-data", "godowns"],
@@ -165,6 +184,24 @@ export default function Wastage() {
     setNewRecord({ ...newRecord, items: newItems });
   };
 
+  const getExportColumns = () => {
+    return [
+      { header: 'Wastage No', key: 'wastage_number' },
+      { header: 'Date', key: 'wastage_date' },
+      { header: 'Godown', key: 'godown_name' },
+      { header: 'Category', key: 'category' },
+      { header: 'Severity', key: 'severity' },
+      { header: 'Status', key: 'status' },
+      { header: 'Reason', key: 'reason' },
+      { header: 'Total Value', key: 'total_value' },
+      { header: 'Created By', key: 'created_by_name' }
+    ];
+  };
+
+  const getReportTitle = () => {
+    return 'Wastage Report';
+  };
+
   if (activeRecordId && activeRecord) {
     return (
       <div className="space-y-6">
@@ -258,18 +295,27 @@ export default function Wastage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <PrintHeader title={getReportTitle()} />
+      <div className="flex items-center justify-between no-print">
         <div>
           <h2 className="text-2xl font-bold text-white tracking-tight">Wastage Tracking</h2>
           <p className="text-slate-400 text-sm mt-1">Record and monitor stock wastage and losses.</p>
         </div>
-        <button 
-          onClick={() => setShowNewModal(true)}
-          className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-rose-600/20 transition-all flex items-center gap-2"
-        >
-          <Plus size={18} />
-          <span>New Wastage Record</span>
-        </button>
+        <div className="flex gap-3">
+          <ExportButton 
+            data={records}
+            filename={`wastage_report_${new Date().toISOString().split('T')[0]}`}
+            columns={getExportColumns()}
+          />
+          <PrintButton />
+          <button 
+            onClick={() => setShowNewModal(true)}
+            className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-rose-600/20 transition-all flex items-center gap-2"
+          >
+            <Plus size={18} />
+            <span>New Wastage Record</span>
+          </button>
+        </div>
       </div>
 
       <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl">
@@ -302,9 +348,18 @@ export default function Wastage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="p-2 hover:bg-slate-700 rounded-lg text-slate-500 hover:text-white transition-colors">
-                      <ChevronRight size={18} />
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handlePrintDoc(r); }}
+                        className="p-2 hover:bg-slate-700 rounded-lg text-slate-500 hover:text-white transition-colors"
+                        title="Print Wastage"
+                      >
+                        <Printer size={18} />
+                      </button>
+                      <button className="p-2 hover:bg-slate-700 rounded-lg text-slate-500 hover:text-white transition-colors">
+                        <ChevronRight size={18} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -455,6 +510,41 @@ export default function Wastage() {
           </div>
         )}
       </AnimatePresence>
+
+      {printDoc && (
+        <DocumentPrintModal
+          isOpen={!!printDoc}
+          onClose={() => setPrintDoc(null)}
+          title="Wastage Report"
+          documentNumber={printDoc.wastage_number}
+          date={printDoc.wastage_date}
+          status={printDoc.status}
+          details={[
+            { label: 'Godown', value: printDoc.godown_name },
+            { label: 'Category', value: `${printDoc.category} ${printDoc.sub_category ? `(${printDoc.sub_category})` : ''}` },
+            { label: 'Severity', value: printDoc.severity },
+            { label: 'Reason', value: printDoc.reason },
+            { label: 'Remarks', value: printDoc.remarks || '-' },
+            { label: 'Created By', value: printDoc.created_by_name }
+          ]}
+          itemColumns={[
+            { header: 'Item', key: 'item_name' },
+            { header: 'Batch', key: 'batch_number' },
+            { header: 'Reason', key: 'reason_detail' },
+            { header: 'Qty', key: 'quantity', align: 'right' },
+            { header: 'Unit Cost', key: 'unit_cost', align: 'right', isCurrency: true },
+            { header: 'Total', key: 'total_cost', align: 'right', isCurrency: true }
+          ]}
+          items={printDoc.items}
+          totals={[
+            { label: 'Total Value', value: printDoc.total_value, isCurrency: true }
+          ]}
+          signatures={[
+            'Prepared By',
+            'Authorized By'
+          ]}
+        />
+      )}
     </div>
   );
 }

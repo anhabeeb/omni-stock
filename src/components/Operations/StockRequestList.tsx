@@ -8,9 +8,14 @@ import {
   CheckCircle2, 
   AlertCircle,
   XCircle,
-  Truck
+  Truck,
+  Printer
 } from 'lucide-react';
 import { StockRequest, Outlet } from '../../types';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
+import DocumentPrintModal from '../Common/DocumentPrintModal';
 
 interface StockRequestListProps {
   onNewRequest: () => void;
@@ -22,6 +27,7 @@ export const StockRequestList: React.FC<StockRequestListProps> = ({ onNewRequest
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [printDoc, setPrintDoc] = useState<any>(null);
 
   useEffect(() => {
     fetchData();
@@ -61,23 +67,54 @@ export const StockRequestList: React.FC<StockRequestListProps> = ({ onNewRequest
 
   if (loading) return <div className="p-8 text-center">Loading requests...</div>;
 
+  const exportColumns = [
+    { header: 'Request #', key: 'request_number' },
+    { header: 'Outlet', key: 'outlet_name' },
+    { header: 'Date', key: 'requested_date' },
+    { header: 'Status', key: 'status' },
+    { header: 'Created By', key: 'created_by' }
+  ];
+
+  const exportData = filteredRequests.map(r => ({
+    ...r,
+    outlet_name: outlets.find(o => o.id === r.outlet_id)?.name || 'Unknown Outlet',
+    requested_date: new Date(r.requested_date).toLocaleDateString()
+  }));
+
+  const handlePrintDoc = async (e: React.MouseEvent, req: any) => {
+    e.stopPropagation();
+    try {
+      const response = await fetch(`/api/requests/${req.id}`);
+      if (!response.ok) throw new Error('Failed to fetch request details');
+      const details = await response.json();
+      setPrintDoc(details);
+    } catch (error) {
+      console.error("Failed to load request details for printing", error);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+      <PrintHeader title="Stock Requests" filters={`Search: ${searchTerm || 'All'}`} />
+      <div className="flex justify-between items-center no-print">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Stock Requests</h1>
           <p className="text-sm text-gray-500">Manage outlet stock requests and warehouse dispatches</p>
         </div>
-        <button 
-          onClick={onNewRequest}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          New Request
-        </button>
+        <div className="flex items-center gap-3">
+          <ExportButton data={exportData} filename="stock-requests" columns={exportColumns} />
+          <PrintButton />
+          <button 
+            onClick={onNewRequest}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New Request
+          </button>
+        </div>
       </div>
 
-      <div className="flex gap-4 items-center bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+      <div className="flex gap-4 items-center bg-white p-4 rounded-xl border border-gray-100 shadow-sm no-print">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input 
@@ -128,6 +165,13 @@ export const StockRequestList: React.FC<StockRequestListProps> = ({ onNewRequest
                     {req.created_by}
                   </td>
                   <td className="px-6 py-4 text-right">
+                    <button 
+                      onClick={(e) => handlePrintDoc(e, req)}
+                      className="p-2 hover:bg-gray-200 rounded-lg text-gray-400 hover:text-gray-600 transition-colors mr-2"
+                      title="Print Document"
+                    >
+                      <Printer size={16} />
+                    </button>
                     <ChevronRight className="w-4 h-4 text-gray-400 inline" />
                   </td>
                 </tr>
@@ -143,6 +187,34 @@ export const StockRequestList: React.FC<StockRequestListProps> = ({ onNewRequest
           </table>
         </div>
       </div>
+
+      {printDoc && (
+        <DocumentPrintModal
+          isOpen={!!printDoc}
+          onClose={() => setPrintDoc(null)}
+          title="Stock Request"
+          documentNumber={printDoc.request_number}
+          date={printDoc.requested_date}
+          status={printDoc.status}
+          details={[
+            { label: 'Outlet', value: outlets.find(o => o.id === printDoc.outlet_id)?.name || 'Unknown Outlet' },
+            { label: 'Remarks', value: printDoc.remarks || 'N/A' },
+          ]}
+          items={printDoc.items || []}
+          itemColumns={[
+            { header: 'Item', key: 'item_id' },
+            { header: 'Requested Qty', key: 'requested_quantity', align: 'right' },
+            { header: 'Approved Qty', key: 'approved_quantity', align: 'right' },
+            { header: 'Fulfilled Qty', key: 'fulfilled_quantity', align: 'right' },
+            { header: 'Remarks', key: 'remarks' },
+          ]}
+          signatures={[
+            'Requested By',
+            'Approved By',
+            'Fulfilled By'
+          ]}
+        />
+      )}
     </div>
   );
 };

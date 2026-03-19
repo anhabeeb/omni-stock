@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { Search, ArrowUpRight, ArrowDownLeft, RefreshCw, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useQuery } from '@tanstack/react-query';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
 
 const MovementLedger: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,6 +27,16 @@ const MovementLedger: React.FC = () => {
     m.movement_type?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const exportColumns = [
+    { header: 'Date / Time', key: (row: any) => new Date(row.created_at).toLocaleString() },
+    { header: 'Item', key: 'item_name' },
+    { header: 'Type', key: 'movement_type' },
+    { header: 'Godown', key: 'godown_name' },
+    { header: 'Qty', key: 'quantity' },
+    { header: 'Reference', key: 'reference_id' },
+    { header: 'Remarks', key: 'remarks' }
+  ];
+
   const getMovementIcon = (type: string) => {
     switch (type) {
       case 'grn': return <ArrowDownLeft className="w-5 h-5 text-emerald-500" />;
@@ -39,21 +52,27 @@ const MovementLedger: React.FC = () => {
 
   return (
     <div className="p-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+      <PrintHeader title="Stock Movement Ledger" filters={{ search: searchTerm }} />
+      
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 no-print">
         <div>
           <h1 className="text-3xl font-bold text-white">Stock Movement Ledger</h1>
           <p className="text-slate-400 mt-1">Audit trail of all inventory transactions</p>
         </div>
         
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-          <input 
-            type="text"
-            placeholder="Search item or reference..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="bg-slate-900 border border-slate-800 rounded-2xl pl-12 pr-6 py-3 text-white w-full md:w-80 focus:ring-2 focus:ring-emerald-500 transition-all"
-          />
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+            <input 
+              type="text"
+              placeholder="Search item or reference..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="bg-slate-900 border border-slate-800 rounded-2xl pl-12 pr-6 py-3 text-white w-full md:w-80 focus:ring-2 focus:ring-emerald-500 transition-all"
+            />
+          </div>
+          <ExportButton data={filteredMovements} filename="movement-ledger" columns={exportColumns} />
+          <PrintButton />
         </div>
       </div>
 

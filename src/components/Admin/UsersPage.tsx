@@ -15,11 +15,15 @@ import {
   Lock,
   UserPlus,
   UserMinus,
-  Trash2
+  Trash2,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TableSkeleton } from '../Common/LoadingSkeleton';
 import { cn } from '../../utils/cn';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
 
 interface User {
   id: string;
@@ -149,26 +153,47 @@ export default function UsersPage() {
 
   if (isLoading) return <TableSkeleton />;
 
+  const exportColumns = [
+    { header: 'Username', key: 'username' },
+    { header: 'Full Name', key: 'full_name' },
+    { header: 'Email', key: 'email' },
+    { header: 'Phone', key: 'phone' },
+    { header: 'Role', key: 'role_name' },
+    { header: 'Status', key: 'is_active' },
+    { header: 'Last Login', key: 'last_login' }
+  ];
+
+  const exportData = users.map(u => ({
+    ...u,
+    is_active: u.is_active ? 'Active' : 'Inactive',
+    last_login: u.last_login ? new Date(u.last_login).toLocaleString() : 'Never'
+  }));
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <PrintHeader title="User Management" filters={`Search: ${search || 'All'} | Role: ${roles.find(r => r.id === roleFilter)?.name || 'All'} | Status: ${statusFilter === 1 ? 'Active' : statusFilter === 0 ? 'Inactive' : 'All'}`} />
+      <div className="flex items-center justify-between no-print">
         <div>
           <h2 className="text-2xl font-bold text-white">User Management</h2>
           <p className="text-slate-400 text-sm mt-1">Manage system users, roles and permissions.</p>
         </div>
-        {hasPermission('users.create') && (
-          <button 
-            onClick={() => { setEditingUser(null); setIsModalOpen(true); }}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2"
-          >
-            <UserPlus size={18} />
-            <span>Add User</span>
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          <ExportButton data={exportData} filename="users-list" columns={exportColumns} />
+          <PrintButton />
+          {hasPermission('users.create') && (
+            <button 
+              onClick={() => { setEditingUser(null); setIsModalOpen(true); }}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2"
+            >
+              <UserPlus size={18} />
+              <span>Add User</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-wrap items-center gap-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 flex flex-wrap items-center gap-4 no-print">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
           <input 
@@ -267,6 +292,28 @@ export default function UsersPage() {
                           >
                             <Lock size={16} />
                           </button>
+                          {hasPermission('onboarding.reset') && (
+                            <button 
+                              onClick={async () => {
+                                if (confirm(`Are you sure you want to reset the tutorial for ${user.full_name}?`)) {
+                                  try {
+                                    const res = await fetch(`/api/onboarding/reset/${user.id}`, {
+                                      method: 'POST',
+                                      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                                    });
+                                    if (res.ok) alert('Tutorial reset successfully');
+                                    else alert('Failed to reset tutorial');
+                                  } catch (err) {
+                                    alert('Error resetting tutorial');
+                                  }
+                                }
+                              }}
+                              className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                              title="Reset Tutorial"
+                            >
+                              <Sparkles size={16} />
+                            </button>
+                          )}
                         </>
                       )}
                       {hasPermission('users.deactivate') && user.id !== currentUser.id && (

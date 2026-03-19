@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { Search, Package, Warehouse, AlertTriangle, Clock } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
 
 const CurrentStock: React.FC = () => {
   const [search, setSearch] = useState("");
@@ -23,17 +26,34 @@ const CurrentStock: React.FC = () => {
     s.godown_name?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const exportColumns = [
+    { header: 'Item Name', key: 'item_name' },
+    { header: 'SKU', key: 'item_sku' },
+    { header: 'Godown', key: 'godown_name' },
+    { header: 'Batch Number', key: 'batch_number' },
+    { header: 'Expiry Date', key: (row: any) => row.expiry_date ? new Date(row.expiry_date).toLocaleDateString() : '' },
+    { header: 'Qty on Hand', key: 'total_quantity' },
+    { header: 'Unit', key: 'unit_name' },
+    { header: 'Status', key: (row: any) => row.total_quantity <= row.min_stock_level ? 'Low Stock' : 'In Stock' }
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <PrintHeader title="Current Stock Report" filters={{ search }} />
+      
+      <div className="flex justify-between items-center no-print">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Current Stock Levels</h1>
           <p className="text-slate-400 mt-1">Real-time inventory visibility across all godowns</p>
         </div>
+        <div className="flex items-center gap-3">
+          <ExportButton data={filtered} filename="current-stock" columns={exportColumns} />
+          <PrintButton />
+        </div>
       </div>
 
       <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-        <div className="p-4 border-b border-slate-800 flex items-center gap-4 bg-slate-900/50">
+        <div className="p-4 border-b border-slate-800 flex items-center gap-4 bg-slate-900/50 no-print">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
             <input 

@@ -3,6 +3,9 @@ import { Search, Calendar } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useQuery } from '@tanstack/react-query';
 import { useSettings } from '../../contexts/SettingsContext';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
 
 const BatchStock: React.FC = () => {
   const { format } = useSettings();
@@ -25,23 +28,39 @@ const BatchStock: React.FC = () => {
     s.batch_number?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const exportColumns = [
+    { header: 'Item Name', key: 'item_name' },
+    { header: 'SKU', key: 'item_sku' },
+    { header: 'Godown', key: 'godown_name' },
+    { header: 'Batch #', key: 'batch_number' },
+    { header: 'Expiry', key: 'expiry_date' },
+    { header: 'On Hand', key: 'quantity_on_hand' },
+    { header: 'Reserved', key: 'reserved_quantity' },
+    { header: 'Avg Cost', key: 'average_unit_cost' }
+  ];
+
   return (
     <div className="p-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+      <PrintHeader title="Current Stock by Batch" filters={searchTerm ? `Search: ${searchTerm}` : undefined} />
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 no-print">
         <div>
-          <h1 className="text-3xl font-bold text-white">Current Stock by Batch</h1>
-          <p className="text-slate-400 mt-1">Real-time inventory levels across all godowns</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Current Stock by Batch</h1>
+          <p className="text-gray-500 dark:text-slate-400 mt-1">Real-time inventory levels across all godowns</p>
         </div>
         
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-          <input 
-            type="text"
-            placeholder="Search items or batches..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="bg-slate-900 border border-slate-800 rounded-2xl pl-12 pr-6 py-3 text-white w-full md:w-80 focus:ring-2 focus:ring-emerald-500 transition-all"
-          />
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-slate-500" />
+            <input 
+              type="text"
+              placeholder="Search items or batches..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl pl-12 pr-6 py-3 text-gray-900 dark:text-white w-full md:w-80 focus:ring-2 focus:ring-blue-500 dark:focus:ring-emerald-500 transition-all"
+            />
+          </div>
+          <ExportButton data={filteredStock} filename="batch-stock" columns={exportColumns} />
+          <PrintButton />
         </div>
       </div>
 

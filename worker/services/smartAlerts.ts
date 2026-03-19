@@ -1,7 +1,13 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { IdService } from "./id";
+
 export class SmartAlertsService {
-  constructor(private db: D1Database) {}
+  private idService: IdService;
+
+  constructor(private db: D1Database) {
+    this.idService = new IdService(db);
+  }
 
   async getLowStockForecast(daysThreshold = 7) {
     // Calculate average daily issue rate for last 30 days
@@ -212,7 +218,7 @@ export class SmartAlertsService {
   }
 
   async acknowledgeAlert(alertId: string, userId: string) {
-    const id = crypto.randomUUID();
+    const id = await this.idService.generateId('ack');
     const now = new Date().toISOString();
     await this.db.prepare(`
       INSERT OR IGNORE INTO acknowledged_alerts (id, alert_id, user_id, acknowledged_at)

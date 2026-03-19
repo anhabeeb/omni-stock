@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { AlertTriangle, Calendar } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useQuery } from '@tanstack/react-query';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
 
 const ExpiryAlerts: React.FC = () => {
   const [days, setDays] = useState(30);
@@ -18,9 +21,19 @@ const ExpiryAlerts: React.FC = () => {
     staleTime: 60000, // 60 seconds
   });
 
+  const exportColumns = [
+    { header: 'Item Name', key: 'item_name' },
+    { header: 'Godown', key: 'godown_name' },
+    { header: 'Batch #', key: 'batch_number' },
+    { header: 'Expiry Date', key: (row: any) => new Date(row.expiry_date).toLocaleDateString() },
+    { header: 'Days Left', key: (row: any) => Math.ceil((new Date(row.expiry_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) },
+    { header: 'Current Qty', key: 'current_quantity' }
+  ];
+
   return (
     <div className="p-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+      <PrintHeader title="Expiry Alerts" filters={`Alert Threshold: ${days} Days`} />
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 no-print">
         <div>
           <h1 className="text-3xl font-bold text-white flex items-center">
             <AlertTriangle className="w-8 h-8 mr-3 text-rose-500" /> Expiry Alerts
@@ -29,18 +42,22 @@ const ExpiryAlerts: React.FC = () => {
         </div>
         
         <div className="flex items-center space-x-4">
-          <label className="text-xs font-bold text-slate-500 uppercase">Alert Threshold (Days):</label>
-          <select 
-            value={days}
-            onChange={e => setDays(parseInt(e.target.value))}
-            className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-rose-500"
-          >
-            <option value="7">7 Days</option>
-            <option value="15">15 Days</option>
-            <option value="30">30 Days</option>
-            <option value="60">60 Days</option>
-            <option value="90">90 Days</option>
-          </select>
+          <div className="flex items-center space-x-2">
+            <label className="text-xs font-bold text-slate-500 uppercase">Alert Threshold (Days):</label>
+            <select 
+              value={days}
+              onChange={e => setDays(parseInt(e.target.value))}
+              className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-white focus:ring-2 focus:ring-rose-500"
+            >
+              <option value="7">7 Days</option>
+              <option value="15">15 Days</option>
+              <option value="30">30 Days</option>
+              <option value="60">60 Days</option>
+              <option value="90">90 Days</option>
+            </select>
+          </div>
+          <ExportButton data={alerts} filename={`expiry-alerts-${days}-days`} columns={exportColumns} />
+          <PrintButton />
         </div>
       </div>
 

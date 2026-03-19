@@ -1,15 +1,20 @@
 /// <reference types="@cloudflare/workers-types" />
+import { IdService } from "./id";
 import { Notification } from "../../src/types";
 
 export class NotificationService {
-  constructor(private db: any) {}
+  private idService: IdService;
 
-  private generateId() {
-    return crypto.randomUUID();
+  constructor(private db: any) {
+    this.idService = new IdService(db);
+  }
+
+  private async generateId() {
+    return await this.idService.generateId('ntf');
   }
 
   async createNotification(userId: string, type: string, severity: string, message: string, relatedEntityType?: string, relatedEntityId?: string) {
-    const id = this.generateId();
+    const id = await this.generateId();
     const now = new Date().toISOString();
 
     await this.db.prepare(`
@@ -50,14 +55,15 @@ export class NotificationService {
       WHERE r.name = 'Admin' OR r.name = 'Warehouse Manager'
     `).all();
 
-    const statements = (admins as any[]).map(admin => {
-      const id = this.generateId();
+    const statements = [];
+    for (const admin of admins as any[]) {
+      const id = await this.generateId();
       const now = new Date().toISOString();
-      return this.db.prepare(`
+      statements.push(this.db.prepare(`
         INSERT INTO notifications (id, user_id, type, severity, message, related_entity_type, related_entity_id, is_read, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
-      `).bind(id, admin.id, type, severity, message, relatedEntityType || null, relatedEntityId || null, now);
-    });
+      `).bind(id, admin.id, type, severity, message, relatedEntityType || null, relatedEntityId || null, now));
+    }
 
     if (statements.length > 0) {
       await this.db.batch(statements);

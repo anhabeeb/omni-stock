@@ -18,6 +18,10 @@ import {
   Cell
 } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
+import { useSettings } from '../../contexts/SettingsContext';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
 
 interface KPISummary {
   totalInventoryValue: number;
@@ -34,6 +38,7 @@ interface TurnoverData {
 }
 
 export const KPIDashboard: React.FC = () => {
+  const { format } = useSettings();
   const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useQuery<KPISummary>({
     queryKey: ['kpi', 'summary'],
     queryFn: async () => {
@@ -64,21 +69,21 @@ export const KPIDashboard: React.FC = () => {
   const stats = [
     {
       label: 'Total Inventory Value',
-      value: `₹${summary?.totalInventoryValue.toLocaleString()}`,
+      value: format(summary?.totalInventoryValue || 0),
       icon: Package,
       color: 'text-blue-600',
       bg: 'bg-blue-50'
     },
     {
       label: 'Wastage (30d)',
-      value: `₹${summary?.wastageValue30d.toLocaleString()}`,
+      value: format(summary?.wastageValue30d || 0),
       icon: AlertTriangle,
       color: 'text-orange-600',
       bg: 'bg-orange-50'
     },
     {
       label: 'Expiry Risk (30d)',
-      value: `₹${summary?.expiryRiskValue30d.toLocaleString()}`,
+      value: format(summary?.expiryRiskValue30d || 0),
       icon: Clock,
       color: 'text-red-600',
       bg: 'bg-red-50'
@@ -92,17 +97,50 @@ export const KPIDashboard: React.FC = () => {
     }
   ];
 
+  const exportData = [
+    {
+      metric: 'Total Inventory Value',
+      value: format(summary?.totalInventoryValue || 0)
+    },
+    {
+      metric: 'Wastage (30d)',
+      value: format(summary?.wastageValue30d || 0)
+    },
+    {
+      metric: 'Expiry Risk (30d)',
+      value: format(summary?.expiryRiskValue30d || 0)
+    },
+    {
+      metric: 'Avg. Dispatch Time (Days)',
+      value: summary?.avgDispatchDays.toFixed(1)
+    },
+    {
+      metric: 'Turnover Ratio',
+      value: turnover?.turnoverRatio.toFixed(2)
+    }
+  ];
+
+  const exportColumns = [
+    { header: 'Metric', key: 'metric' },
+    { header: 'Value', key: 'value' }
+  ];
+
   return (
     <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Warehouse Intelligence</h1>
-        <button 
-          onClick={handleRefresh}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium"
-        >
-          <Activity className="w-4 h-4" />
-          Refresh Data
-        </button>
+      <PrintHeader title="KPI Dashboard Summary" />
+      <div className="flex justify-between items-center no-print">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Warehouse Intelligence</h1>
+        <div className="flex items-center gap-3">
+          <ExportButton data={exportData} filename="kpi-summary" columns={exportColumns} />
+          <PrintButton />
+          <button 
+            onClick={handleRefresh}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium"
+          >
+            <Activity className="w-4 h-4" />
+            Refresh Data
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}

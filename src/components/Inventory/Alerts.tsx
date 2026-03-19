@@ -4,6 +4,9 @@ import {
   RefreshCw, AlertCircle
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
 
 export default function Alerts() {
   const [selectedGodown, setSelectedGodown] = useState('');
@@ -32,6 +35,66 @@ export default function Alerts() {
     },
     staleTime: 1000 * 60 * 10, // 10 minutes
   });
+
+  const getExportData = () => {
+    if (!alerts) return [];
+    const data: any[] = [];
+    
+    alerts.lowStock?.forEach((item: any) => {
+      data.push({
+        Type: 'Low Stock',
+        Item: item.item_name || item.name,
+        Godown: item.godown_name,
+        Batch: item.batch_number || '-',
+        'Current Qty': item.total_qty || item.quantity_on_hand,
+        'Threshold/Expiry': item.reorder_level || '-'
+      });
+    });
+
+    alerts.nearExpiry?.forEach((item: any) => {
+      data.push({
+        Type: 'Expiring Soon',
+        Item: item.item_name || item.name,
+        Godown: item.godown_name,
+        Batch: item.batch_number || '-',
+        'Current Qty': item.total_qty || item.quantity_on_hand,
+        'Threshold/Expiry': item.expiry_date ? new Date(item.expiry_date).toLocaleDateString() : '-'
+      });
+    });
+
+    alerts.expired?.forEach((item: any) => {
+      data.push({
+        Type: 'Expired',
+        Item: item.item_name || item.name,
+        Godown: item.godown_name,
+        Batch: item.batch_number || '-',
+        'Current Qty': item.total_qty || item.quantity_on_hand,
+        'Threshold/Expiry': item.expiry_date ? new Date(item.expiry_date).toLocaleDateString() : '-'
+      });
+    });
+
+    alerts.deadStock?.forEach((item: any) => {
+      data.push({
+        Type: 'Dead Stock',
+        Item: item.item_name || item.name,
+        Godown: item.godown_name,
+        Batch: item.batch_number || '-',
+        'Current Qty': item.total_qty || item.quantity_on_hand,
+        'Threshold/Expiry': '-'
+      });
+    });
+
+    return data;
+  };
+
+  const exportColumns = [
+    { header: 'Alert Type', key: 'Type' },
+    { header: 'Item Name', key: 'Item' },
+    { header: 'Godown', key: 'Godown' },
+    { header: 'Batch #', key: 'Batch' },
+    { header: 'Current Qty', key: 'Current Qty' },
+    { header: 'Threshold / Expiry', key: 'Threshold/Expiry' }
+  ];
 
   const AlertSection = ({ title, icon: Icon, data, color, emptyMsg }: any) => (
     <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
@@ -90,12 +153,13 @@ export default function Alerts() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <PrintHeader title="System Alerts & Monitoring" filters={selectedGodown ? `Godown: ${godowns.find(g => g.id === selectedGodown)?.name}` : 'All Godowns'} />
+      <div className="flex items-center justify-between no-print">
         <div>
           <h2 className="text-2xl font-bold text-white tracking-tight">System Alerts & Monitoring</h2>
           <p className="text-slate-400 text-sm mt-1">Real-time monitoring of stock levels, expiry, and dead stock.</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-center">
           <select 
             value={selectedGodown}
             onChange={(e) => setSelectedGodown(e.target.value)}
@@ -104,6 +168,8 @@ export default function Alerts() {
             <option value="">All Godowns</option>
             {godowns.map((g: any) => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
+          <ExportButton data={getExportData()} filename="system-alerts" columns={exportColumns} />
+          <PrintButton />
           <button 
             onClick={() => refetchAlerts()}
             className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 border border-slate-800"

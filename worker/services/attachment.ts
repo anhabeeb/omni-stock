@@ -1,11 +1,16 @@
 /// <reference types="@cloudflare/workers-types" />
+import { IdService } from "./id";
 import { Attachment } from "../../src/types";
 
 export class AttachmentService {
-  constructor(private db: any, private bucket: any) {}
+  private idService: IdService;
 
-  private generateId() {
-    return crypto.randomUUID();
+  constructor(private db: any, private bucket: any) {
+    this.idService = new IdService(db);
+  }
+
+  private async generateId() {
+    return await this.idService.generateId('att');
   }
 
   async uploadAttachment(userId: string, entityType: string, entityId: string, file: File) {
@@ -26,7 +31,7 @@ export class AttachmentService {
       throw new Error("File type not allowed");
     }
 
-    const id = this.generateId();
+    const id = await this.generateId();
     const now = new Date().toISOString();
     const key = `attachments/${entityType}/${entityId}/${id}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
 

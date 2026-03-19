@@ -1,17 +1,22 @@
 /// <reference types="@cloudflare/workers-types" />
+import { IdService } from "./id";
 import { InventoryService } from "./inventory";
 import { StockCountSession, StockCountItem, InventoryBalanceSummary } from "../../src/types";
 
 export class StockCountService {
-  constructor(private db: any) {}
+  private idService: IdService;
 
-  private generateId() {
-    return crypto.randomUUID();
+  constructor(private db: any) {
+    this.idService = new IdService(db);
+  }
+
+  private async generateId(prefix: string) {
+    return await this.idService.generateId(prefix);
   }
 
   async createSession(godownId: string, userId: string, remarks?: string) {
-    const id = this.generateId();
-    const sessionNumber = `SC-${Date.now()}`;
+    const id = await this.generateId('cnt');
+    const sessionNumber = id;
     const now = new Date().toISOString();
 
     await this.db.prepare(`
@@ -42,7 +47,7 @@ export class StockCountService {
           counted_quantity, variance_quantity, base_variance_quantity, unit_cost, variance_value
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
-        this.generateId(), sessionId, balance.item_id, balance.batch_id || null, 
+        await this.generateId('cnt_item'), sessionId, balance.item_id, balance.batch_id || null, 
         balance.quantity_on_hand, balance.quantity_on_hand, 0, 0, 
         balance.average_unit_cost || 0, 0
       ));
@@ -98,8 +103,8 @@ export class StockCountService {
     }
 
     // Create a Stock Adjustment to reconcile
-    const adjId = this.generateId();
-    const adjNumber = `ADJ-RECON-${session.session_number}`;
+    const adjId = await this.generateId('adj');
+    const adjNumber = adjId;
     const statements = [];
 
     statements.push(this.db.prepare(`
@@ -117,7 +122,7 @@ export class StockCountService {
           entered_unit_id, base_quantity, unit_cost, total_cost, remarks
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
-        this.generateId(), adjId, item.item_id, item.batch_id || null, direction, absQty, 
+        await this.generateId('adj_item'), adjId, item.item_id, item.batch_id || null, direction, absQty, 
         item.entered_unit_id || null, absQty, item.unit_cost || 0, Math.abs(item.variance_value || 0), 
         `Reconciliation variance: ${item.base_variance_quantity}`
       ));

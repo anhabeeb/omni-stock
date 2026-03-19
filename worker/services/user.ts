@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { IdService } from "./id";
+
 export interface User {
   id: string;
   username: string;
@@ -23,7 +25,11 @@ export interface Role {
 }
 
 export class UserService {
-  constructor(private db: any) {}
+  private idService: IdService;
+
+  constructor(private db: any) {
+    this.idService = new IdService(db);
+  }
 
   async getUsers(filters?: { role_id?: string; is_active?: number; search?: string }): Promise<User[]> {
     let query = `
@@ -96,7 +102,7 @@ export class UserService {
   }
 
   async createUser(userData: Partial<User> & { password_hash: string }): Promise<string> {
-    const id = crypto.randomUUID();
+    const id = await this.idService.generateId('usr');
     await this.db.prepare(`
       INSERT INTO users (id, username, email, password_hash, full_name, phone, role_id, is_active)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)

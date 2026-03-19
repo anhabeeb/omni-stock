@@ -17,6 +17,10 @@ import {
   Area
 } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
+import { useSettings } from '../../contexts/SettingsContext';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
 
 interface DiscrepancySummary {
   totalVariance: number;
@@ -26,10 +30,13 @@ interface DiscrepancySummary {
 }
 
 export const DiscrepancyAnalytics: React.FC = () => {
+  const { format } = useSettings();
   const { data: summary, isLoading: summaryLoading } = useQuery<DiscrepancySummary>({
     queryKey: ['discrepancies', 'summary'],
     queryFn: async () => {
-      const res = await fetch('/api/discrepancies/summary');
+      const res = await fetch('/api/discrepancies/summary', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
       if (!res.ok) throw new Error('Failed to fetch discrepancy summary');
       return res.json();
     },
@@ -39,7 +46,9 @@ export const DiscrepancyAnalytics: React.FC = () => {
   const { data: trends = [], isLoading: trendsLoading } = useQuery<any[]>({
     queryKey: ['discrepancies', 'trends'],
     queryFn: async () => {
-      const res = await fetch('/api/discrepancies/trends');
+      const res = await fetch('/api/discrepancies/trends', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
       if (!res.ok) throw new Error('Failed to fetch trends');
       return res.json();
     },
@@ -49,27 +58,28 @@ export const DiscrepancyAnalytics: React.FC = () => {
   if (summaryLoading || trendsLoading) return <div className="p-8 text-center">Loading Discrepancy Analytics...</div>;
 
   const stats = [
-    { label: 'Total Variance (30d)', value: `₹${summary?.totalVariance.toLocaleString() || 0}`, icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Shrinkage (Loss)', value: `₹${summary?.shrinkageValue.toLocaleString() || 0}`, icon: TrendingDown, color: 'text-red-600', bg: 'bg-red-50' },
-    { label: 'Overage (Gain)', value: `₹${summary?.overageValue.toLocaleString() || 0}`, icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50' }
+    { label: 'Total Variance (30d)', value: format(summary?.totalVariance || 0), icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Shrinkage (Loss)', value: format(summary?.shrinkageValue || 0), icon: TrendingDown, color: 'text-red-600', bg: 'bg-red-50' },
+    { label: 'Overage (Gain)', value: format(summary?.overageValue || 0), icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50' }
+  ];
+
+  const exportColumns = [
+    { header: 'Item Name', key: 'item_name' },
+    { header: 'Total Item Variance Qty', key: 'total_item_variance_qty' },
+    { header: 'Total Item Variance Value', key: 'total_item_variance' }
   ];
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+      <PrintHeader title="Shrinkage & Discrepancy Analytics" />
+      <div className="flex justify-between items-center no-print">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Shrinkage & Discrepancy Analytics</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Shrinkage & Discrepancy Analytics</h1>
           <p className="text-sm text-gray-500">Inventory variance detection and loss prevention</p>
         </div>
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium">
-            <Filter className="w-4 h-4" />
-            Filter
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
-            <Download className="w-4 h-4" />
-            Export Report
-          </button>
+          <ExportButton data={summary?.highVarianceItems || []} filename="discrepancy-analytics" columns={exportColumns} />
+          <PrintButton />
         </div>
       </div>
 

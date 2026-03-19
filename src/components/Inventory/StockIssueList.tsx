@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
 import { Plus, Search, FileText, CheckCircle, XCircle, Clock, Store } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
+import DocumentPrintModal from '../Common/DocumentPrintModal';
 
 const StockIssueList: React.FC = () => {
   const [search, setSearch] = useState("");
+  const [printDoc, setPrintDoc] = useState<any>(null);
 
   const { data: issues = [], isLoading: loading } = useQuery<any[]>({
     queryKey: ['issues'],
@@ -33,28 +38,54 @@ const StockIssueList: React.FC = () => {
     }
   };
 
+  const exportColumns = [
+    { header: 'Issue Number', key: 'issue_number' },
+    { header: 'Outlet', key: 'outlet_id' },
+    { header: 'Issue Date', key: 'issue_date' },
+    { header: 'Source Godown', key: 'source_godown_id' },
+    { header: 'Status', key: 'status' }
+  ];
+
+  const handlePrintDoc = async (issue: any) => {
+    try {
+      const response = await fetch(`/api/issues/${issue.id}`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!response.ok) throw new Error('Failed to fetch issue details');
+      const details = await response.json();
+      setPrintDoc(details);
+    } catch (error) {
+      console.error("Failed to load issue details for printing", error);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <PrintHeader title="Stock Issues" filters={search ? `Search: ${search}` : undefined} />
+      <div className="flex justify-between items-center no-print">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Stock Issues</h1>
-          <p className="text-slate-400 mt-1">Manage stock distribution to outlets</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Stock Issues</h1>
+          <p className="text-gray-500 dark:text-slate-400 mt-1">Manage stock distribution to outlets</p>
         </div>
-        <button className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20 font-semibold active:scale-95">
-          <Plus size={20} /> New Issue
-        </button>
+        <div className="flex items-center gap-3">
+          <ExportButton data={filtered} filename="stock-issues" columns={exportColumns} />
+          <PrintButton />
+          <button className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/20 font-semibold active:scale-95">
+            <Plus size={20} /> New Issue
+          </button>
+        </div>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-        <div className="p-4 border-b border-slate-800 flex items-center gap-4 bg-slate-900/50">
+      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+        <div className="p-4 border-b border-gray-200 dark:border-slate-800 flex items-center gap-4 bg-gray-50 dark:bg-slate-900/50 no-print">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" size={18} />
             <input 
               type="text" 
               placeholder="Search issue number, outlet..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-gray-900 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-emerald-500/50 transition-all placeholder:text-gray-400 dark:placeholder:text-slate-500"
             />
           </div>
         </div>
@@ -68,7 +99,7 @@ const StockIssueList: React.FC = () => {
                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Issue Date</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Source Godown</th>
                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right">Actions</th>
+                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider text-right no-print">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
@@ -92,8 +123,12 @@ const StockIssueList: React.FC = () => {
                   <td className="px-6 py-4 text-slate-400">{new Date(issue.issue_date).toLocaleDateString()}</td>
                   <td className="px-6 py-4 text-slate-400">{issue.source_godown_id}</td>
                   <td className="px-6 py-4">{getStatusBadge(issue.status)}</td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors">
+                  <td className="px-6 py-4 text-right no-print">
+                    <button 
+                      onClick={() => handlePrintDoc(issue)}
+                      className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
+                      title="Print Document"
+                    >
                       <FileText size={18} />
                     </button>
                   </td>
@@ -103,6 +138,33 @@ const StockIssueList: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {printDoc && (
+        <DocumentPrintModal
+          isOpen={!!printDoc}
+          onClose={() => setPrintDoc(null)}
+          title="Stock Issue Note"
+          documentNumber={printDoc.issue_number}
+          date={printDoc.issue_date}
+          status={printDoc.status}
+          details={[
+            { label: 'Outlet', value: printDoc.outlet_id },
+            { label: 'Source Godown', value: printDoc.source_godown_id },
+            { label: 'Remarks', value: printDoc.remarks || 'N/A' },
+          ]}
+          items={printDoc.items || []}
+          itemColumns={[
+            { header: 'Item', key: 'item_id' },
+            { header: 'Batch', key: 'batch_number' },
+            { header: 'Qty', key: 'issued_quantity', align: 'right' },
+            { header: 'Unit Cost', key: 'unit_cost', isCurrency: true, align: 'right' },
+            { header: 'Total', key: 'total_line_cost', isCurrency: true, align: 'right' },
+          ]}
+          totals={[
+            { label: 'Total Value', value: printDoc.items?.reduce((sum: number, item: any) => sum + (item.total_line_cost || 0), 0) || 0, isCurrency: true }
+          ]}
+        />
+      )}
     </div>
   );
 };

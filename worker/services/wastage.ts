@@ -1,17 +1,22 @@
 /// <reference types="@cloudflare/workers-types" />
+import { IdService } from "./id";
 import { InventoryService } from "./inventory";
 import { WastageRecord, WastageRecordItem, StockBatch } from "../../src/types";
 
 export class WastageService {
-  constructor(private db: any) {}
+  private idService: IdService;
 
-  private generateId() {
-    return crypto.randomUUID();
+  constructor(private db: any) {
+    this.idService = new IdService(db);
+  }
+
+  private async generateId(prefix: string) {
+    return await this.idService.generateId(prefix);
   }
 
   async createWastage(body: any, userId: string) {
-    const id = this.generateId();
-    const wastageNumber = `WST-${Date.now()}`;
+    const id = await this.generateId('wst');
+    const wastageNumber = id;
     const now = new Date().toISOString();
 
     const statements = [];
@@ -30,7 +35,7 @@ export class WastageService {
           base_quantity, unit_cost, total_cost, reason_detail, remarks
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
-        this.generateId(), id, item.item_id, item.batch_id || null, item.quantity, 
+        await this.generateId('wst_item'), id, item.item_id, item.batch_id || null, item.quantity, 
         item.entered_unit_id, baseQty, item.unit_cost, item.total_cost, 
         item.reason_detail || null, item.remarks || null
       ));
@@ -135,7 +140,7 @@ export class WastageService {
           unit_cost, total_value, movement_date, created_by, created_at, remarks
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
-        this.generateId(), 'adjustment_minus', 'stock_adjustment', wastageId, 
+        await this.generateId('mov'), 'adjustment_minus', 'stock_adjustment', wastageId, 
         item.item_id, item.batch_id || null, record.godown_id, 
         item.quantity, item.entered_unit_id, item.base_quantity, 
         item.unit_cost, item.total_cost, record.wastage_date, userId, now, 

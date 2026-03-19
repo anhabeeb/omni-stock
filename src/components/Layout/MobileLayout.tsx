@@ -38,9 +38,7 @@ export default function MobileLayout({ children, activeTab, onTabChange, user, o
       {/* Header */}
       <header className="sticky top-0 z-50 bg-black/80 backdrop-blur-xl border-b border-slate-800 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-            <Package size={18} className="text-white" />
-          </div>
+          <img src="/icon.png" alt="OmniStock Logo" className="w-8 h-8 object-contain" />
           <span className="font-bold text-lg tracking-tight">OmniStock</span>
         </div>
         <div className="flex items-center gap-3">

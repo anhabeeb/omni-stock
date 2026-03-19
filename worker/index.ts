@@ -4,12 +4,12 @@ import { z } from 'zod';
 
 const grnSchema = z.object({
   grn_number: z.string().min(1).max(50),
-  supplier_id: z.string().uuid(),
+  supplier_id: z.string(),
   received_date: z.string().datetime(),
-  godown_id: z.string().uuid(),
+  godown_id: z.string(),
   remarks: z.string().optional(),
   items: z.array(z.object({
-    item_id: z.string().uuid(),
+    item_id: z.string(),
     entered_quantity: z.number().positive(),
     entered_unit_id: z.number().int().positive(),
     unit_cost: z.number().nonnegative(),
@@ -35,9 +35,11 @@ import { DiscrepancyService } from './services/discrepancy';
 import { KPIService } from './services/kpi';
 import { AttachmentService } from './services/attachment';
 import { NotificationService } from './services/notification';
+import { OnboardingService } from './services/onboarding';
 import { UserService } from './services/user';
 import { SettingsService } from './services/settings';
 import { SetupService } from './services/setup';
+import { IdService } from './services/id';
 import { ReferenceType } from '../src/types';
 import { CacheManager } from './cache';
 import { hashPassword, verifyPassword } from './utils/auth';
@@ -88,6 +90,25 @@ const rateLimiter = async (c: any, next: any) => {
 };
 
 app.use('*', cors());
+
+// --- Initialization Check Middleware ---
+const initCheckMiddleware = async (c: Context<{ Bindings: Bindings; Variables: Variables }>, next: Next) => {
+  const path = c.req.path;
+  // Skip check for setup, public settings, and login
+  if (path.startsWith('/api/setup') || path === '/api/settings/public' || path === '/api/auth/login') {
+    await next();
+    return;
+  }
+
+  const setupService = new SetupService(c.env.DB);
+  const status = await setupService.getBootstrapStatus();
+  if (!status.is_initialized) {
+    return c.json({ message: "System not initialized", needsSetup: true }, 403);
+  }
+  await next();
+};
+
+app.use('/api/*', initCheckMiddleware);
 
 // --- Auth Middleware ---
 const authMiddleware = async (c: Context<{ Bindings: Bindings; Variables: Variables }>, next: Next) => {
@@ -151,9 +172,10 @@ app.post("/api/auth/login", rateLimiter, async (c) => {
   const setupService = new SetupService(c.env.DB);
   
   // Check if DB is initialized
-  if (!(await setupService.isInitialized())) {
+  const bootstrapStatus = await setupService.getBootstrapStatus();
+  if (!bootstrapStatus.is_initialized) {
     return c.json({ 
-      message: "Database not initialized. Please run setup.",
+      message: "System not initialized. Please run setup wizard.",
       needsSetup: true 
     }, 400);
   }
@@ -202,14 +224,74 @@ app.get("/api/settings/public", async (c) => {
 // Setup & Initialization
 app.get("/api/setup/status", async (c) => {
   const setupService = new SetupService(c.env.DB);
-  const initialized = await setupService.isInitialized();
-  return c.json({ initialized });
+  const status = await setupService.getBootstrapStatus();
+  return c.json(status);
+});
+
+app.post("/api/setup/initialize", async (c) => {
+  const data = await c.req.json();
+  const setupService = new SetupService(c.env.DB);
+  const result = await setupService.initializeSystem(data);
+  return c.json(result, result.success ? 200 : 400);
 });
 
 app.post("/api/setup/init", async (c) => {
   const setupService = new SetupService(c.env.DB);
   const result = await setupService.initialize();
   return c.json(result, result.success ? 200 : 500);
+});
+
+// Emergency Admin Reset
+app.get("/api/setup/reset-admin", async (c) => {
+  const hash = 'e22d2a64f93df13c3560a0420e926529006adc85d12b24735fced9e5d13664b6'; // omnistock123
+  try {
+    await c.env.DB.prepare("UPDATE users SET password_hash = ? WHERE username = 'admin'").bind(hash).run();
+    return c.json({ message: "Admin password reset to 'omnistock123' successfully" });
+  } catch (e: any) {
+    return c.json({ message: e.message }, 500);
+  }
+});
+
+// Onboarding
+app.get("/api/onboarding/status", authMiddleware, async (c) => {
+  const user = c.get('user');
+  const onboardingService = new OnboardingService(c.env.DB);
+  const status = await onboardingService.getStatus(user.id);
+  return c.json(status);
+});
+
+app.post("/api/onboarding/start", authMiddleware, async (c) => {
+  const user = c.get('user');
+  const onboardingService = new OnboardingService(c.env.DB);
+  await onboardingService.startTutorial(user.id);
+  return c.json({ success: true });
+});
+
+app.post("/api/onboarding/complete", authMiddleware, async (c) => {
+  const user = c.get('user');
+  const onboardingService = new OnboardingService(c.env.DB);
+  await onboardingService.completeTutorial(user.id);
+  return c.json({ success: true });
+});
+
+app.post("/api/onboarding/self-reset", authMiddleware, async (c) => {
+  const user = c.get('user');
+  const onboardingService = new OnboardingService(c.env.DB);
+  await onboardingService.resetTutorial(user.id);
+  return c.json({ success: true });
+});
+
+app.post("/api/onboarding/reset/:userId", authMiddleware, requirePermission('onboarding.reset'), async (c) => {
+  const userId = c.req.param('userId');
+  const onboardingService = new OnboardingService(c.env.DB);
+  await onboardingService.resetTutorial(userId);
+  return c.json({ success: true });
+});
+
+app.get("/api/onboarding/users", authMiddleware, requirePermission('onboarding.reset'), async (c) => {
+  const onboardingService = new OnboardingService(c.env.DB);
+  const statuses = await onboardingService.getAllStatuses();
+  return c.json(statuses);
 });
 
 // Users & Settings (Protected)
@@ -392,9 +474,11 @@ app.post("/api/grn", authMiddleware, requirePermission('inventory.grn'), async (
     const body = await c.req.json();
     const validatedData = grnSchema.parse(body);
     
-    const id = crypto.randomUUID();
-    const user = c.get('jwtPayload') as any;
     const inventoryService = new InventoryService(c.env.DB);
+    const idService = new IdService(c.env.DB);
+    
+    const id = await idService.generateId('grn');
+    const user = c.get('jwtPayload') as any;
     
     const statements: any[] = [];
     statements.push(c.env.DB.prepare(`
@@ -410,7 +494,7 @@ app.post("/api/grn", authMiddleware, requirePermission('inventory.grn'), async (
           batch_number, manufacture_date, expiry_date, unit_cost, total_line_cost
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
-        crypto.randomUUID(), id, item.item_id, item.entered_quantity, item.entered_unit_id, baseQty,
+        await idService.generateId('grn_item'), id, item.item_id, item.entered_quantity, item.entered_unit_id, baseQty,
         item.batch_number, item.manufacture_date, item.expiry_date, item.unit_cost, item.total_line_cost
       ));
     }
@@ -469,9 +553,11 @@ app.get("/api/issues", authMiddleware, async (c) => {
 
 app.post("/api/issues", authMiddleware, requirePermission('inventory.issue'), async (c) => {
   const body = await c.req.json();
-  const id = crypto.randomUUID();
-  const user = c.get('jwtPayload') as any;
   const inventoryService = new InventoryService(c.env.DB);
+  const idService = new IdService(c.env.DB);
+  
+  const id = await idService.generateId('iss');
+  const user = c.get('jwtPayload') as any;
   
   const statements: any[] = [];
   statements.push(c.env.DB.prepare(`
@@ -481,7 +567,7 @@ app.post("/api/issues", authMiddleware, requirePermission('inventory.issue'), as
 
   if (body.items && body.items.length > 0) {
     for (const item of body.items) {
-      const itemId = crypto.randomUUID();
+      const itemId = await idService.generateId('iss_item');
       const baseQty = await inventoryService.convertToBaseQuantity(item.item_id, item.entered_unit_id, item.issued_quantity);
       statements.push(c.env.DB.prepare(`
         INSERT INTO stock_issue_items (
@@ -497,7 +583,7 @@ app.post("/api/issues", authMiddleware, requirePermission('inventory.issue'), as
           statements.push(c.env.DB.prepare(`
             INSERT INTO stock_issue_batch_allocations (id, stock_issue_item_id, batch_id, allocated_quantity, allocated_base_quantity)
             VALUES (?, ?, ?, ?, ?)
-          `).bind(crypto.randomUUID(), itemId, alloc.batch_id, alloc.allocated_quantity, alloc.allocated_base_quantity));
+          `).bind(await idService.generateId('iss_alloc'), itemId, alloc.batch_id, alloc.allocated_quantity, alloc.allocated_base_quantity));
         }
       }
     }
@@ -557,11 +643,28 @@ app.get("/api/transfers", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
+app.get("/api/transfers/:id", authMiddleware, async (c) => {
+  const id = c.req.param("id");
+  const transfer = await c.env.DB.prepare("SELECT * FROM transfers WHERE id = ?").bind(id).first();
+  if (!transfer) return c.json({ error: "Transfer not found" }, 404);
+  
+  const { results: items } = await c.env.DB.prepare(`
+    SELECT ti.*, i.name as item_name, i.sku, i.barcode
+    FROM transfer_items ti
+    JOIN items i ON ti.item_id = i.id
+    WHERE ti.transfer_id = ?
+  `).bind(id).all();
+  
+  return c.json({ ...transfer, items });
+});
+
 app.post("/api/transfers", authMiddleware, requirePermission('inventory.transfer'), async (c) => {
   const body = await c.req.json();
-  const id = crypto.randomUUID();
-  const user = c.get('jwtPayload') as any;
   const inventoryService = new InventoryService(c.env.DB);
+  const idService = new IdService(c.env.DB);
+  
+  const id = await idService.generateId('trf');
+  const user = c.get('jwtPayload') as any;
   
   const statements: any[] = [];
   statements.push(c.env.DB.prepare(`
@@ -571,7 +674,7 @@ app.post("/api/transfers", authMiddleware, requirePermission('inventory.transfer
 
   if (body.items && body.items.length > 0) {
     for (const item of body.items) {
-      const itemId = crypto.randomUUID();
+      const itemId = await idService.generateId('trf_item');
       const baseQty = await inventoryService.convertToBaseQuantity(item.item_id, item.entered_unit_id, item.entered_quantity);
       statements.push(c.env.DB.prepare(`
         INSERT INTO transfer_items (id, transfer_id, item_id, entered_quantity, entered_unit_id, base_quantity, remarks)
@@ -583,7 +686,7 @@ app.post("/api/transfers", authMiddleware, requirePermission('inventory.transfer
           statements.push(c.env.DB.prepare(`
             INSERT INTO transfer_batch_allocations (id, transfer_item_id, batch_id, allocated_quantity, allocated_base_quantity)
             VALUES (?, ?, ?, ?, ?)
-          `).bind(crypto.randomUUID(), itemId, alloc.batch_id, alloc.allocated_quantity, alloc.allocated_base_quantity));
+          `).bind(await idService.generateId('trf_alloc'), itemId, alloc.batch_id, alloc.allocated_quantity, alloc.allocated_base_quantity));
         }
       }
     }
@@ -634,9 +737,11 @@ app.get("/api/adjustments", authMiddleware, async (c) => {
 
 app.post("/api/adjustments", authMiddleware, requirePermission('inventory.adjust'), async (c) => {
   const body = await c.req.json();
-  const id = crypto.randomUUID();
-  const user = c.get('jwtPayload') as any;
   const inventoryService = new InventoryService(c.env.DB);
+  const idService = new IdService(c.env.DB);
+  
+  const id = await idService.generateId('adj');
+  const user = c.get('jwtPayload') as any;
   
   const statements: any[] = [];
   statements.push(c.env.DB.prepare(`
@@ -653,7 +758,7 @@ app.post("/api/adjustments", authMiddleware, requirePermission('inventory.adjust
           entered_unit_id, base_quantity, unit_cost, total_cost, remarks
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
-        crypto.randomUUID(), id, item.item_id, item.batch_id, item.direction, item.entered_quantity,
+        await idService.generateId('adj_item'), id, item.item_id, item.batch_id, item.direction, item.entered_quantity,
         item.entered_unit_id, baseQty, item.unit_cost, item.total_cost, item.remarks
       ));
     }
@@ -1252,7 +1357,8 @@ app.get("/api/finance/sales-trend", authMiddleware, requirePermission('finance.v
 // Sales Management (Minimal)
 app.post("/api/sales", authMiddleware, async (c) => {
   const body = await c.req.json();
-  const id = crypto.randomUUID();
+  const idService = new IdService(c.env.DB);
+  const id = await idService.generateId('sal');
   const user = c.get('jwtPayload') as any;
   const now = new Date().toISOString();
 
@@ -1266,7 +1372,7 @@ app.post("/api/sales", authMiddleware, async (c) => {
     statements.push(c.env.DB.prepare(`
       INSERT INTO sales_document_items (id, sales_document_id, item_id, quantity, sales_price, net_sales_value, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).bind(crypto.randomUUID(), id, item.item_id, item.quantity, item.sales_price, item.net_sales_value, now));
+    `).bind(await idService.generateId('sal_item'), id, item.item_id, item.quantity, item.sales_price, item.net_sales_value, now));
   }
 
   await c.env.DB.batch(statements);

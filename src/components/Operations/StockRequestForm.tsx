@@ -8,10 +8,12 @@ import {
   XCircle, 
   ChevronLeft,
   Package,
-  AlertCircle
+  AlertCircle,
+  Printer
 } from 'lucide-react';
 import { Item, Outlet, StockRequest, StockRequestItem } from '../../types';
 import { AttachmentManager } from '../Common/AttachmentManager';
+import DocumentPrintModal from '../Common/DocumentPrintModal';
 
 interface StockRequestFormProps {
   requestId?: string;
@@ -25,6 +27,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({ requestId, o
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [request, setRequest] = useState<StockRequest | null>(null);
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   const [formData, setFormData] = useState({
     outlet_id: '',
@@ -167,6 +170,15 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({ requestId, o
           </div>
         </div>
         <div className="flex gap-3">
+          {request && (
+            <button 
+              onClick={() => setShowPrintModal(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium"
+            >
+              <Printer className="w-4 h-4" />
+              Print
+            </button>
+          )}
           {!isReadOnly && (
             <>
               <button 
@@ -339,6 +351,34 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({ requestId, o
           </div>
         </div>
       </div>
+
+      {request && showPrintModal && (
+        <DocumentPrintModal
+          isOpen={showPrintModal}
+          onClose={() => setShowPrintModal(false)}
+          title="Stock Request"
+          documentNumber={request.request_number}
+          date={request.requested_date}
+          status={request.status}
+          details={[
+            { label: 'Outlet', value: outlets.find(o => o.id === request.outlet_id)?.name || 'Unknown Outlet' },
+            { label: 'Remarks', value: request.remarks || 'N/A' },
+          ]}
+          items={request.items || []}
+          itemColumns={[
+            { header: 'Item', key: 'item_id' },
+            { header: 'Requested Qty', key: 'requested_quantity', align: 'right' },
+            { header: 'Approved Qty', key: 'approved_quantity', align: 'right' },
+            { header: 'Fulfilled Qty', key: 'fulfilled_quantity', align: 'right' },
+            { header: 'Remarks', key: 'remarks' },
+          ]}
+          signatures={[
+            'Requested By',
+            'Approved By',
+            'Fulfilled By'
+          ]}
+        />
+      )}
     </div>
   );
 };

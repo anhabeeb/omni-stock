@@ -12,6 +12,9 @@ import { useQuery, useQueryClient, QueryClientProvider, QueryClient } from "@tan
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 import UsersPage from "./components/Admin/UsersPage";
 import SettingsPage from "./components/Admin/SettingsPage";
+import { SetupWizard } from "./components/Setup/SetupWizard";
+import { Tutorial } from "./components/Onboarding/Tutorial";
+import axios from "axios";
 import { 
   LayoutDashboard, 
   Package, 
@@ -162,9 +165,7 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
         isSidebarOpen ? "w-64" : "w-20"
       )}>
         <div className="p-6 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
-            <Warehouse size={24} />
-          </div>
+          <img src="/icon.png" alt="OmniStock Logo" className="w-10 h-10 object-contain" />
           {isSidebarOpen && (
             <motion.span 
               initial={{ opacity: 0, x: -10 }}
@@ -452,9 +453,7 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User, token: string) => void }
         className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl"
       >
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-500 flex items-center justify-center text-white shadow-xl shadow-emerald-500/20 mb-4">
-            <Warehouse size={32} />
-          </div>
+          <img src="/trans_logo.png" alt="OmniStock Logo" className="h-24 object-contain mb-4" />
           <h2 className="text-2xl font-bold text-white">OmniStock</h2>
           <p className="text-slate-400 mt-1">Warehouse Management System</p>
         </div>
@@ -760,37 +759,95 @@ const MasterListPage = ({ title, endpoint, columns }: { title: string, endpoint:
 function AppContent() {
   const [user, setUser] = useState<User | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [isInitialized, setIsInitialized] = useState<boolean | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
   const { width } = useWindowSize();
   const isMobile = width < 768;
   const [mobileTab, setMobileTab] = useState('dashboard');
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-    const token = localStorage.getItem("token");
-    if (savedUser && token) {
-      setUser(JSON.parse(savedUser));
-    }
-    setIsReady(true);
+    const initialize = async () => {
+      // 1. Check if system is initialized
+      try {
+        const res = await axios.get('/api/setup/status');
+        setIsInitialized(res.data.is_initialized);
+      } catch (err) {
+        console.error("Failed to check setup status:", err);
+        setIsInitialized(true); // Assume initialized to avoid blocking if API fails
+      }
+
+      // 2. Check auth and onboarding
+      const savedUser = localStorage.getItem("user");
+      const token = localStorage.getItem("token");
+      if (savedUser && token) {
+        setUser(JSON.parse(savedUser));
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        
+        // Only check onboarding if logged in
+        try {
+          const res = await axios.get('/api/onboarding/status');
+          if (res.data && (res.data.tutorial_completed === 0 || res.data.force_tutorial === 1)) {
+            setShowTutorial(true);
+          }
+        } catch (err) {
+          console.error("Failed to check onboarding status:", err);
+        }
+      }
+      
+      setIsReady(true);
+    };
+
+    initialize();
   }, []);
+
+  const checkOnboarding = async () => {
+    try {
+      const res = await axios.get('/api/onboarding/status');
+      if (res.data && (res.data.tutorial_completed === 0 || res.data.force_tutorial === 1)) {
+        setShowTutorial(true);
+      }
+    } catch (err) {
+      console.error("Failed to check onboarding status:", err);
+    }
+  };
 
   const handleLogin = (user: User, token: string) => {
     setUser(user);
     localStorage.setItem("user", JSON.stringify(user));
     localStorage.setItem("token", token);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    checkOnboarding();
   };
 
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem("user");
     localStorage.removeItem("token");
+    delete axios.defaults.headers.common['Authorization'];
   };
 
-  if (!isReady) return null;
+  if (!isReady || isInitialized === null) return (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+    </div>
+  );
+
+  if (!isInitialized) {
+    return (
+      <Router>
+        <Routes>
+          <Route path="/setup" element={<SetupWizard onComplete={() => setIsInitialized(true)} />} />
+          <Route path="*" element={<Navigate to="/setup" />} />
+        </Routes>
+      </Router>
+    );
+  }
 
   if (user && isMobile) {
     return (
       <Router>
         <Suspense fallback={<LoadingSkeleton />}>
+          {showTutorial && <Tutorial role={user.role} onComplete={() => setShowTutorial(false)} />}
           <MobileLayout 
             user={user} 
             activeTab={mobileTab} 
@@ -826,6 +883,7 @@ function AppContent() {
 
   return (
     <Router>
+      {showTutorial && user && <Tutorial role={user.role} onComplete={() => setShowTutorial(false)} />}
       {!user ? (
         <Routes>
           <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />

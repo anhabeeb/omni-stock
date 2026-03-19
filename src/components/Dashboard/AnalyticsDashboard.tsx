@@ -10,6 +10,9 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useSettings } from '../../contexts/SettingsContext';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -58,6 +61,23 @@ export default function AnalyticsDashboard() {
     fetchData();
   }, [filters.godownId]); // Refresh on godown change
 
+  const exportColumns = [
+    { header: 'Metric', key: 'metric' },
+    { header: 'Value', key: 'value' }
+  ];
+
+  const getExportData = () => {
+    return [
+      { metric: 'Total Stock Value', value: summary?.totalValue || 0 },
+      { metric: 'Total Quantity', value: summary?.totalQuantity || 0 },
+      { metric: 'Low Stock Items', value: summary?.lowStockCount || 0 },
+      { metric: 'Wastage (Period)', value: summary?.wastageValue || 0 },
+      { metric: 'Near Expiry (30d)', value: summary?.nearExpiryCount || 0 },
+      { metric: 'Dead Stock (90d)', value: summary?.deadStockCount || 0 },
+      { metric: 'Expired Value', value: summary?.expiredValue || 0 },
+    ];
+  };
+
   const StatCard = ({ icon: Icon, label, value, subValue, color, isCurrency }: any) => (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -82,8 +102,9 @@ export default function AnalyticsDashboard() {
 
   return (
     <div className="space-y-8">
+      <PrintHeader title="Analytics Dashboard" filters={`Godown: ${godowns.find(g => g.id === filters.godownId)?.name || 'All'} | From: ${filters.from} To: ${filters.to}`} />
       {/* Filters */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/50 p-4 rounded-2xl border border-slate-800 no-print">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-slate-400">
             <Filter size={18} />
@@ -98,12 +119,16 @@ export default function AnalyticsDashboard() {
             {godowns.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
         </div>
-        <button 
-          onClick={fetchData}
-          className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 transition-colors"
-        >
-          <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
-        </button>
+        <div className="flex items-center gap-3">
+          <ExportButton data={getExportData()} filename={`analytics-summary-${filters.from}-to-${filters.to}`} columns={exportColumns} />
+          <PrintButton />
+          <button 
+            onClick={fetchData}
+            className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 transition-colors"
+          >
+            <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+          </button>
+        </div>
       </div>
 
       {/* Summary Stats */}

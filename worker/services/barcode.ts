@@ -1,7 +1,13 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { IdService } from "./id";
+
 export class BarcodeService {
-  constructor(private db: D1Database) {}
+  private idService: IdService;
+
+  constructor(private db: D1Database) {
+    this.idService = new IdService(db);
+  }
 
   async lookupItemByCode(code: string) {
     // Search in items (SKU) and item_barcodes
@@ -30,7 +36,7 @@ export class BarcodeService {
   }
 
   async addItemBarcode(itemId: string, barcode: string, type: string = 'primary') {
-    const id = crypto.randomUUID();
+    const id = await this.idService.generateId('ib');
     const now = new Date().toISOString();
     await this.db.prepare(`
       INSERT INTO item_barcodes (id, item_id, barcode, barcode_type, created_at)

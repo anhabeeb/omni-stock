@@ -19,11 +19,17 @@ import {
   InventoryBalanceSummary
 } from "../../src/types";
 
-export class InventoryService {
-  constructor(private db: any) {}
+import { IdService } from "./id";
 
-  private generateId() {
-    return crypto.randomUUID();
+export class InventoryService {
+  private idService: IdService;
+
+  constructor(private db: any) {
+    this.idService = new IdService(db);
+  }
+
+  private async generateId(prefix: string) {
+    return await this.idService.generateId(prefix);
   }
 
   async convertToBaseQuantity(itemId: string, unitId: number, quantity: number): Promise<number> {
@@ -72,8 +78,9 @@ export class InventoryService {
     };
   }
 
-  public prepareUpdateBalance(itemId: string, godownId: string, batchId: string | null, delta: number, unitCost?: number): any {
+  public async prepareUpdateBalance(itemId: string, godownId: string, batchId: string | null, delta: number, unitCost?: number): Promise<any> {
     const now = new Date().toISOString();
+    const id = await this.generateId('bal');
     return this.db.prepare(`
       INSERT INTO inventory_balance_summary (
         id, item_id, godown_id, batch_id, quantity_on_hand, average_unit_cost, updated_at
@@ -86,7 +93,7 @@ export class InventoryService {
         END,
         quantity_on_hand = quantity_on_hand + EXCLUDED.quantity_on_hand,
         updated_at = EXCLUDED.updated_at
-    `).bind(this.generateId(), itemId, godownId, batchId, delta, unitCost ?? null, now);
+    `).bind(id, itemId, godownId, batchId, delta, unitCost ?? null, now);
   }
 
   async postGRN(grnId: string, userId: string) {
@@ -105,7 +112,7 @@ export class InventoryService {
         throw new Error(`Expiry date is required for perishable item ${item.item_id}`);
       }
 
-      const batchId = this.generateId();
+      const batchId = await this.generateId('bat');
 
       statements.push(this.db.prepare(`
         INSERT INTO stock_batches (
@@ -126,13 +133,13 @@ export class InventoryService {
           total_value, movement_date, created_by, created_at, remarks
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
-        this.generateId(), 'purchase_receipt', 'goods_receipt', grnId, 
+        await this.generateId('mov'), 'purchase_receipt', 'goods_receipt', grnId, 
         item.item_id, batchId, grn.godown_id, item.entered_quantity, 
         item.entered_unit_id, item.base_quantity, item.unit_cost, 
         item.total_line_cost, grn.received_date, userId, now, grn.remarks
       ));
 
-      statements.push(this.prepareUpdateBalance(item.item_id, grn.godown_id, batchId, item.base_quantity, item.unit_cost));
+      statements.push(await this.prepareUpdateBalance(item.item_id, grn.godown_id, batchId, item.base_quantity, item.unit_cost));
     }
 
     statements.push(this.db.prepare(`
@@ -179,14 +186,14 @@ export class InventoryService {
             base_quantity, unit_cost, total_value, movement_date, created_by, created_at, remarks
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
-          this.generateId(), 'issue_to_outlet', 'stock_issue', issueId, 
+          await this.generateId('mov'), 'issue_to_outlet', 'stock_issue', issueId, 
           item.item_id, alloc.batch_id, issue.source_godown_id, issue.outlet_id, 
           alloc.allocated_quantity, item.entered_unit_id, alloc.allocated_base_quantity, 
           batch?.current_cost || 0, (batch?.current_cost || 0) * alloc.allocated_base_quantity, 
           issue.issue_date, userId, now, issue.remarks
         ));
 
-        statements.push(this.prepareUpdateBalance(item.item_id, issue.source_godown_id, alloc.batch_id, -alloc.allocated_base_quantity));
+        statements.push(await this.prepareUpdateBalance(item.item_id, issue.source_godown_id, alloc.batch_id, -alloc.allocated_base_quantity));
       }
     }
 
@@ -233,14 +240,14 @@ export class InventoryService {
             base_quantity, unit_cost, total_value, movement_date, created_by, created_at, remarks
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
-          this.generateId(), 'transfer_out', 'transfer', transferId, 
+          await this.generateId('mov'), 'transfer_out', 'transfer', transferId, 
           item.item_id, alloc.batch_id, transfer.source_godown_id, transfer.source_godown_id, transfer.destination_godown_id,
           alloc.allocated_quantity, item.entered_unit_id, alloc.allocated_base_quantity, 
           batch?.current_cost || 0, (batch?.current_cost || 0) * alloc.allocated_base_quantity,
           transfer.transfer_date, userId, now, transfer.remarks
         ));
 
-        statements.push(this.prepareUpdateBalance(item.item_id, transfer.source_godown_id, alloc.batch_id, -alloc.allocated_base_quantity));
+        statements.push(await this.prepareUpdateBalance(item.item_id, transfer.source_godown_id, alloc.batch_id, -alloc.allocated_base_quantity));
       }
     }
 
@@ -269,7 +276,7 @@ export class InventoryService {
         const sourceBatch = await this.db.prepare("SELECT * FROM stock_batches WHERE id = ?").bind(alloc.batch_id).first() as StockBatch;
         if (!sourceBatch) throw new Error("Source batch not found");
 
-        const destBatchId = this.generateId();
+        const destBatchId = await this.generateId('bat');
         statements.push(this.db.prepare(`
           INSERT INTO stock_batches (
             id, item_id, godown_id, batch_number, manufacture_date, expiry_date, 
@@ -289,14 +296,14 @@ export class InventoryService {
             base_quantity, unit_cost, total_value, movement_date, created_by, created_at, remarks
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
-          this.generateId(), 'transfer_in', 'transfer', transferId, 
+          await this.generateId('mov'), 'transfer_in', 'transfer', transferId, 
           item.item_id, destBatchId, transfer.destination_godown_id, transfer.source_godown_id, transfer.destination_godown_id,
           alloc.allocated_quantity, item.entered_unit_id, alloc.allocated_base_quantity, 
           sourceBatch.current_cost, (sourceBatch.current_cost * alloc.allocated_base_quantity),
           now, userId, now, `Received from ${transfer.source_godown_id}`
         ));
 
-        statements.push(this.prepareUpdateBalance(item.item_id, transfer.destination_godown_id, destBatchId, alloc.allocated_base_quantity, sourceBatch.current_cost));
+        statements.push(await this.prepareUpdateBalance(item.item_id, transfer.destination_godown_id, destBatchId, alloc.allocated_base_quantity, sourceBatch.current_cost));
       }
     }
 
@@ -338,13 +345,13 @@ export class InventoryService {
           unit_cost, total_value, movement_date, created_by, created_at, remarks
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
-        this.generateId(), movementType, 'stock_adjustment', adjustmentId, 
+        await this.generateId('mov'), movementType, 'stock_adjustment', adjustmentId, 
         item.item_id, item.batch_id, adj.godown_id, 
         item.entered_quantity, item.entered_unit_id, item.base_quantity, 
         item.unit_cost, item.total_cost, adj.adjustment_date, userId, now, item.remarks || adj.reason
       ));
 
-      statements.push(this.prepareUpdateBalance(item.item_id, adj.godown_id, item.batch_id, qtyDelta, item.unit_cost));
+      statements.push(await this.prepareUpdateBalance(item.item_id, adj.godown_id, item.batch_id, qtyDelta, item.unit_cost));
     }
 
     statements.push(this.db.prepare(`
@@ -370,7 +377,7 @@ export class InventoryService {
           UPDATE stock_batches SET current_quantity = current_quantity - ?, status = 'blocked', updated_at = ? WHERE id = ?
         `).bind(move.base_quantity, now, move.batch_id));
         
-        statements.push(this.prepareUpdateBalance(move.item_id, move.godown_id!, move.batch_id!, -move.base_quantity));
+        statements.push(await this.prepareUpdateBalance(move.item_id, move.godown_id!, move.batch_id!, -move.base_quantity));
         
         statements.push(this.db.prepare(`
           INSERT INTO stock_movements (
@@ -379,7 +386,7 @@ export class InventoryService {
             unit_cost, total_value, movement_date, created_by, created_at, remarks
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
-          this.generateId(), 'adjustment_minus', 'goods_receipt', id, 
+          await this.generateId('mov'), 'adjustment_minus', 'goods_receipt', id, 
           move.item_id, move.batch_id, move.godown_id, 
           move.entered_quantity, move.entered_unit_id, move.base_quantity, 
           move.unit_cost, move.total_value, now, userId, now, `GRN Cancellation Reversal`

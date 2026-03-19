@@ -12,6 +12,9 @@ import { motion } from 'motion/react';
 import { FinanceSummary } from '../../types';
 import { useQuery } from '@tanstack/react-query';
 import { useSettings } from '../../contexts/SettingsContext';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
 
 export default function FinanceDashboard() {
   const { format } = useSettings();
@@ -61,6 +64,15 @@ export default function FinanceDashboard() {
 
   const loading = summaryLoading || marginsLoading || trendLoading;
 
+  const exportColumns = [
+    { header: 'Outlet', key: 'outletName' },
+    { header: 'Revenue', key: 'revenue' },
+    { header: 'COGS', key: 'cogs' },
+    { header: 'Wastage', key: 'wastage' },
+    { header: 'Gross Profit', key: 'grossProfit' },
+    { header: 'Margin %', key: 'marginPercentage' }
+  ];
+
   const StatCard = ({ icon: Icon, label, value, subValue, color, trend, isPercentage }: any) => (
     <motion.div 
       whileHover={{ y: -5 }}
@@ -90,7 +102,8 @@ export default function FinanceDashboard() {
 
   return (
     <div className="p-4 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <PrintHeader title="Finance & Profit" filters={`From: ${filters.from} To: ${filters.to}`} />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Finance & Profit</h1>
           <p className="text-slate-500 text-sm">Revenue, COGS, and Margin Analysis</p>
@@ -111,6 +124,8 @@ export default function FinanceDashboard() {
               className="bg-transparent text-xs font-bold uppercase tracking-widest text-white px-3 py-2 outline-none"
             />
           </div>
+          <ExportButton data={outletMargins} filename={`outlet-margins-${filters.from}-to-${filters.to}`} columns={exportColumns} />
+          <PrintButton />
           <button 
             onClick={handleRefresh}
             className="p-3 bg-slate-900 rounded-2xl border border-slate-800 text-slate-400 hover:text-white transition-all"

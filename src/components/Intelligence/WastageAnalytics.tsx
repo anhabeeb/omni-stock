@@ -15,6 +15,10 @@ import {
   Legend
 } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
+import { useSettings } from '../../contexts/SettingsContext';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
 
 interface WastageAnalyticsData {
   totalWastage: number;
@@ -25,10 +29,13 @@ interface WastageAnalyticsData {
 }
 
 export const WastageAnalytics: React.FC = () => {
+  const { format } = useSettings();
   const { data, isLoading } = useQuery<WastageAnalyticsData>({
     queryKey: ['wastage', 'analytics'],
     queryFn: async () => {
-      const res = await fetch('/api/wastage/analytics');
+      const res = await fetch('/api/wastage/analytics', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
       if (!res.ok) throw new Error('Failed to fetch wastage analytics');
       return res.json();
     },
@@ -39,22 +46,23 @@ export const WastageAnalytics: React.FC = () => {
 
   const COLORS = ['#ef4444', '#f97316', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899'];
 
+  const exportColumns = [
+    { header: 'Item Name', key: 'item_name' },
+    { header: 'Wastage Frequency', key: 'wastage_frequency' },
+    { header: 'Total Loss', key: 'total_loss' }
+  ];
+
   return (
     <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+      <PrintHeader title="Wastage & Spoilage Control" />
+      <div className="flex justify-between items-center no-print">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Wastage & Spoilage Control</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Wastage & Spoilage Control</h1>
           <p className="text-sm text-gray-500">Loss prevention and operational efficiency analytics</p>
         </div>
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium">
-            <Filter className="w-4 h-4" />
-            Filter
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
-            <Download className="w-4 h-4" />
-            Export Report
-          </button>
+          <ExportButton data={data?.recurringWastage || []} filename="wastage-analytics" columns={exportColumns} />
+          <PrintButton />
         </div>
       </div>
 
@@ -67,7 +75,7 @@ export const WastageAnalytics: React.FC = () => {
             </div>
             <div>
               <p className="text-sm text-gray-500 font-medium">Total Loss (30d)</p>
-              <h3 className="text-2xl font-bold text-gray-900">₹{data?.totalWastage.toLocaleString() || 0}</h3>
+              <h3 className="text-2xl font-bold text-gray-900">{format(data?.totalWastage || 0)}</h3>
             </div>
           </div>
         </div>

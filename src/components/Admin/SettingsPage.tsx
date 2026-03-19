@@ -17,6 +17,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { cn } from '../../utils/cn';
+import axios from 'axios';
 
 export default function SettingsPage() {
   const { settings, updateSettings, theme, setTheme, isLoading, error } = useSettings();
@@ -95,7 +96,17 @@ export default function SettingsPage() {
     { id: 'inventory', label: 'Inventory', icon: Warehouse },
     { id: 'ui', label: 'UI & Theme', icon: Palette },
     { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'tutorial', label: 'Tutorial', icon: Clock },
   ];
+
+  const handleRestartTutorial = async () => {
+    try {
+      await axios.post('/api/onboarding/self-reset');
+      window.location.reload(); // Reload to trigger the tutorial check in App.tsx
+    } catch (err) {
+      alert("Failed to reset tutorial");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -326,6 +337,26 @@ export default function SettingsPage() {
                             <p className="text-xs text-slate-500">Alerts above this threshold will be marked as Critical.</p>
                           </div>
                         </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === 'tutorial' && (
+                    <div className="space-y-6">
+                      <div className="max-w-md">
+                        <h4 className="text-lg font-bold text-white mb-2">Onboarding Tutorial</h4>
+                        <p className="text-slate-400 text-sm mb-6">
+                          If you want to revisit the system tour, you can restart the tutorial here. 
+                          This will show the guided walkthrough next time you visit the dashboard.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleRestartTutorial}
+                          className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl border border-slate-700 transition-all font-bold flex items-center gap-2"
+                        >
+                          <Clock size={18} />
+                          Restart Tutorial
+                        </button>
                       </div>
                     </div>
                   )}

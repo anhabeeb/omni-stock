@@ -8,6 +8,10 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { useSettings } from '../../contexts/SettingsContext';
+import { ExportButton } from '../Common/ExportButton';
+import { PrintButton } from '../Common/PrintButton';
+import { PrintHeader } from '../Common/PrintHeader';
 
 interface ExpiryRiskData {
   highRiskCount: number;
@@ -20,10 +24,13 @@ interface ExpiryRiskData {
 }
 
 export const ExpiryRiskDashboard: React.FC = () => {
+  const { format } = useSettings();
   const { data, isLoading: riskLoading } = useQuery<ExpiryRiskData>({
     queryKey: ['expiry', 'risk'],
     queryFn: async () => {
-      const res = await fetch('/api/expiry/risk');
+      const res = await fetch('/api/expiry/risk', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
       if (!res.ok) throw new Error('Failed to fetch expiry risk data');
       return res.json();
     },
@@ -33,7 +40,9 @@ export const ExpiryRiskDashboard: React.FC = () => {
   const { data: recommendations = [], isLoading: recLoading } = useQuery<any[]>({
     queryKey: ['expiry', 'recommendations'],
     queryFn: async () => {
-      const res = await fetch('/api/expiry/recommendations');
+      const res = await fetch('/api/expiry/recommendations', {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
       if (!res.ok) throw new Error('Failed to fetch recommendations');
       return res.json();
     },
@@ -50,22 +59,25 @@ export const ExpiryRiskDashboard: React.FC = () => {
 
   const totalRiskValue = (data?.highRiskValue || 0) + (data?.mediumRiskValue || 0) + (data?.lowRiskValue || 0) || 1;
 
+  const exportColumns = [
+    { header: 'Item Name', key: 'item_name' },
+    { header: 'Batch Number', key: 'batch_number' },
+    { header: 'Expiry Date', key: (row: any) => new Date(row.expiry_date).toLocaleDateString() },
+    { header: 'Quantity', key: 'current_quantity' },
+    { header: 'Total Value', key: 'total_value' }
+  ];
+
   return (
     <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
+      <PrintHeader title="Expiry Risk Forecasting" />
+      <div className="flex justify-between items-center no-print">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Expiry Risk Forecasting</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Expiry Risk Forecasting</h1>
           <p className="text-sm text-gray-500">Predictive analysis and prevention recommendations</p>
         </div>
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-sm font-medium">
-            <Filter className="w-4 h-4" />
-            Filter
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
-            <Download className="w-4 h-4" />
-            Export Report
-          </button>
+          <ExportButton data={data?.topAtRiskItems || []} filename="expiry-risk" columns={exportColumns} />
+          <PrintButton />
         </div>
       </div>
 
@@ -79,7 +91,7 @@ export const ExpiryRiskDashboard: React.FC = () => {
               </div>
               <div>
                 <p className="text-sm text-gray-500 font-medium">{stat.label}</p>
-                <h3 className="text-2xl font-bold text-gray-900">₹{stat.value?.toLocaleString() || 0}</h3>
+                <h3 className="text-2xl font-bold text-gray-900">{format(stat.value || 0)}</h3>
               </div>
             </div>
             <div className="flex items-center justify-between text-sm">

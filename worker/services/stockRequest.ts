@@ -1,16 +1,21 @@
 /// <reference types="@cloudflare/workers-types" />
+import { IdService } from "./id";
 import { StockRequest, StockRequestItem } from "../../src/types";
 
 export class StockRequestService {
-  constructor(private db: any) {}
+  private idService: IdService;
 
-  private generateId() {
-    return crypto.randomUUID();
+  constructor(private db: any) {
+    this.idService = new IdService(db);
+  }
+
+  private async generateId(prefix: string) {
+    return await this.idService.generateId(prefix);
   }
 
   async createRequest(body: any, userId: string) {
-    const id = this.generateId();
-    const requestNumber = `REQ-${Date.now()}`;
+    const id = await this.generateId('req');
+    const requestNumber = id;
     const now = new Date().toISOString();
 
     const statements = [];
@@ -23,7 +28,7 @@ export class StockRequestService {
       statements.push(this.db.prepare(`
         INSERT INTO stock_request_items (id, stock_request_id, item_id, requested_quantity, remarks)
         VALUES (?, ?, ?, ?, ?)
-      `).bind(this.generateId(), id, item.item_id, item.requested_quantity, item.remarks || null));
+      `).bind(await this.generateId('req_item'), id, item.item_id, item.requested_quantity, item.remarks || null));
     }
 
     await this.db.batch(statements);
@@ -45,7 +50,7 @@ export class StockRequestService {
       statements.push(this.db.prepare(`
         INSERT INTO stock_request_items (id, stock_request_id, item_id, requested_quantity, remarks)
         VALUES (?, ?, ?, ?, ?)
-      `).bind(this.generateId(), id, item.item_id, item.requested_quantity, item.remarks || null));
+      `).bind(await this.generateId('req_item'), id, item.item_id, item.requested_quantity, item.remarks || null));
     }
 
     await this.db.batch(statements);

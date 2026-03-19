@@ -3,6 +3,9 @@ import { Search, Filter, ArrowUpRight, ArrowDownLeft, RefreshCw, AlertCircle } f
 import { motion } from "motion/react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { ExportButton } from "../Common/ExportButton";
+import { PrintButton } from "../Common/PrintButton";
+import { PrintHeader } from "../Common/PrintHeader";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -63,23 +66,38 @@ export default function StockMovementLedger() {
     m.reference_id?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const exportColumns = [
+    { header: 'Date', key: 'movement_date' },
+    { header: 'Time', key: 'created_at' },
+    { header: 'Item', key: 'item_name' },
+    { header: 'Type', key: 'movement_type' },
+    { header: 'Godown', key: 'godown_name' },
+    { header: 'Quantity', key: 'base_quantity' },
+    { header: 'Remarks', key: 'remarks' }
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <PrintHeader title="Stock Movement Ledger" filters={`Search: ${search || 'All'}`} />
+      <div className="flex items-center justify-between no-print">
         <div>
           <h2 className="text-2xl font-bold text-white tracking-tight">Stock Movement Ledger</h2>
           <p className="text-slate-400 mt-1">Audit trail of all inventory transactions.</p>
         </div>
-        <button 
-          onClick={fetchMovements}
-          className="p-2.5 hover:bg-slate-800 rounded-xl text-slate-400 border border-slate-700 transition-colors"
-        >
-          <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
-        </button>
+        <div className="flex items-center gap-3">
+          <ExportButton data={filtered} filename="stock-movement-ledger" columns={exportColumns} />
+          <PrintButton />
+          <button 
+            onClick={fetchMovements}
+            className="p-2.5 hover:bg-slate-800 rounded-xl text-slate-400 border border-slate-700 transition-colors"
+          >
+            <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+          </button>
+        </div>
       </div>
 
       <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-        <div className="p-4 border-b border-slate-800 flex items-center gap-4 bg-slate-900/50">
+        <div className="p-4 border-b border-slate-800 flex items-center gap-4 bg-slate-900/50 no-print">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
             <input 
