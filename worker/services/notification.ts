@@ -51,14 +51,13 @@ export class NotificationService {
   async broadcastToAdmins(type: string, severity: string, message: string, relatedEntityType?: string, relatedEntityId?: string) {
     const { results: admins } = await this.db.prepare(`
       SELECT u.id FROM users u 
-      LEFT JOIN roles r ON u.role_id = r.id 
-      WHERE r.id IN ('role_super_admin', 'role_admin', 'role_warehouse_manager')
-         OR u.role_id IN ('1', '2', '3') -- Support legacy numeric IDs
+      JOIN roles r ON u.role_id = r.id 
+      WHERE r.name = 'Admin' OR r.name = 'Warehouse Manager'
     `).all();
 
     const statements = [];
     for (const admin of admins as any[]) {
-      const id = await this.idService.generateId('ntf');
+      const id = await this.generateId();
       const now = new Date().toISOString();
       statements.push(this.db.prepare(`
         INSERT INTO notifications (id, user_id, type, severity, message, related_entity_type, related_entity_id, is_read, created_at)
