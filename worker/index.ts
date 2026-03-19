@@ -380,7 +380,7 @@ app.post("/api/users/:id/reset-password", authMiddleware, requirePermission('use
   const id = c.req.param('id');
   const { password } = await c.req.json();
   const userService = new UserService(c.env.DB);
-  const currentUser = c.get('user');
+  const currentUser = c.get('user') as any;
 
   const targetUser = await userService.getUserById(id);
   if (targetUser?.role_name === 'super_admin' && currentUser.role_name !== 'super_admin') {
@@ -390,6 +390,42 @@ app.post("/api/users/:id/reset-password", authMiddleware, requirePermission('use
   const hash = await hashPassword(password);
   await userService.resetPassword(id, hash);
   return c.json({ message: "Password reset successfully" });
+});
+
+app.get("/api/permissions", authMiddleware, requirePermission('users.permissions.manage'), async (c) => {
+  const userService = new UserService(c.env.DB);
+  const permissions = await userService.getAllPermissions();
+  return c.json(permissions);
+});
+
+app.get("/api/users/:id/permissions", authMiddleware, requirePermission('users.permissions.manage'), async (c) => {
+  const id = c.req.param('id');
+  const userService = new UserService(c.env.DB);
+  const overrides = await userService.getUserPermissionOverrides(id);
+  const effective = await userService.getUserPermissions(id);
+  return c.json({ overrides, effective });
+});
+
+app.put("/api/users/:id/permissions", authMiddleware, requirePermission('users.permissions.manage'), async (c) => {
+  const id = c.req.param('id');
+  const { grants, denials } = await c.req.json();
+  const userService = new UserService(c.env.DB);
+  const currentUser = c.get('user') as any;
+
+  const targetUser = await userService.getUserById(id);
+  if (targetUser?.role_name === 'super_admin' && currentUser.role_name !== 'super_admin') {
+    return c.json({ message: "Only super_admin can manage super_admin permissions" }, 403);
+  }
+  
+  await userService.updateUserPermissions(id, grants, denials, currentUser.id);
+  return c.json({ success: true });
+});
+
+app.get("/api/roles/:id/permissions", authMiddleware, requirePermission('roles.view'), async (c) => {
+  const id = c.req.param('id');
+  const userService = new UserService(c.env.DB);
+  const permissions = await userService.getRolePermissions(id);
+  return c.json(permissions);
 });
 
 app.get("/api/roles", authMiddleware, requirePermission('roles.view'), async (c) => {
@@ -419,14 +455,14 @@ app.put("/api/settings", authMiddleware, requirePermission('settings.update'), a
 });
 
 // Master Data
-app.get("/api/items", authMiddleware, async (c) => {
+app.get("/api/items", authMiddleware, requirePermission('master.items.view'), async (c) => {
   const cached = await CacheManager.get(c, 600);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare("SELECT * FROM items").all();
   return CacheManager.put(c, c.json(results), 600);
 });
 
-app.get("/api/items/:id", authMiddleware, async (c) => {
+app.get("/api/items/:id", authMiddleware, requirePermission('master.items.view'), async (c) => {
   const id = c.req.param("id");
   const item = await c.env.DB.prepare("SELECT * FROM items WHERE id = ?").bind(id).first();
   if (!item) return c.json({ error: "Not found" }, 404);
@@ -491,14 +527,14 @@ app.delete("/api/items/:id", authMiddleware, requirePermission('master.items.dea
 });
 
 // Suppliers
-app.get("/api/suppliers", authMiddleware, async (c) => {
+app.get("/api/suppliers", authMiddleware, requirePermission('master.suppliers.view'), async (c) => {
   const cached = await CacheManager.get(c, 600);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare("SELECT * FROM suppliers").all();
   return CacheManager.put(c, c.json(results), 600);
 });
 
-app.get("/api/suppliers/:id", authMiddleware, async (c) => {
+app.get("/api/suppliers/:id", authMiddleware, requirePermission('master.suppliers.view'), async (c) => {
   const id = c.req.param("id");
   const supplier = await c.env.DB.prepare("SELECT * FROM suppliers WHERE id = ?").bind(id).first();
   if (!supplier) return c.json({ error: "Not found" }, 404);
@@ -558,14 +594,14 @@ app.delete("/api/suppliers/:id", authMiddleware, requirePermission('master.suppl
 });
 
 // Godowns
-app.get("/api/godowns", authMiddleware, async (c) => {
+app.get("/api/godowns", authMiddleware, requirePermission('master.godowns.view'), async (c) => {
   const cached = await CacheManager.get(c, 600);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare("SELECT * FROM godowns").all();
   return CacheManager.put(c, c.json(results), 600);
 });
 
-app.get("/api/godowns/:id", authMiddleware, async (c) => {
+app.get("/api/godowns/:id", authMiddleware, requirePermission('master.godowns.view'), async (c) => {
   const id = c.req.param("id");
   const godown = await c.env.DB.prepare("SELECT * FROM godowns WHERE id = ?").bind(id).first();
   if (!godown) return c.json({ error: "Not found" }, 404);
@@ -625,14 +661,14 @@ app.delete("/api/godowns/:id", authMiddleware, requirePermission('master.godowns
 });
 
 // Outlets
-app.get("/api/outlets", authMiddleware, async (c) => {
+app.get("/api/outlets", authMiddleware, requirePermission('master.outlets.view'), async (c) => {
   const cached = await CacheManager.get(c, 600);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare("SELECT * FROM outlets").all();
   return CacheManager.put(c, c.json(results), 600);
 });
 
-app.get("/api/outlets/:id", authMiddleware, async (c) => {
+app.get("/api/outlets/:id", authMiddleware, requirePermission('master.outlets.view'), async (c) => {
   const id = c.req.param("id");
   const outlet = await c.env.DB.prepare("SELECT * FROM outlets WHERE id = ?").bind(id).first();
   if (!outlet) return c.json({ error: "Not found" }, 404);
@@ -706,7 +742,7 @@ app.get("/api/units", authMiddleware, async (c) => {
 });
 
 // GRN
-app.get("/api/grn", authMiddleware, async (c) => {
+app.get("/api/grn", authMiddleware, requirePermission('inventory.grn'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare("SELECT * FROM goods_receipts ORDER BY created_at DESC").all();
@@ -754,7 +790,7 @@ app.post("/api/grn", authMiddleware, requirePermission('inventory.grn'), async (
   }
 });
 
-app.get("/api/grn/:id", authMiddleware, async (c) => {
+app.get("/api/grn/:id", authMiddleware, requirePermission('inventory.grn'), async (c) => {
   const id = c.req.param('id');
   const grn = await c.env.DB.prepare("SELECT * FROM goods_receipts WHERE id = ?").bind(id).first();
   const { results: items } = await c.env.DB.prepare("SELECT * FROM goods_receipt_items WHERE goods_receipt_id = ?").bind(id).all();
@@ -788,7 +824,7 @@ app.post("/api/grn/:id/cancel", authMiddleware, requirePermission('inventory.grn
 });
 
 // Issues
-app.get("/api/issues", authMiddleware, async (c) => {
+app.get("/api/issues", authMiddleware, requirePermission('inventory.issue'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare("SELECT * FROM stock_issues ORDER BY created_at DESC").all();
@@ -842,7 +878,7 @@ app.post("/api/issues", authMiddleware, requirePermission('inventory.issue'), as
   }
 });
 
-app.get("/api/issues/:id", authMiddleware, async (c) => {
+app.get("/api/issues/:id", authMiddleware, requirePermission('inventory.issue'), async (c) => {
   const id = c.req.param('id');
   const issue = await c.env.DB.prepare("SELECT * FROM stock_issues WHERE id = ?").bind(id).first();
   const { results: items } = await c.env.DB.prepare("SELECT * FROM stock_issue_items WHERE stock_issue_id = ?").bind(id).all();
@@ -869,7 +905,7 @@ app.post("/api/issues/:id/post", authMiddleware, requirePermission('inventory.is
   }
 });
 
-app.get("/api/inventory/fefo-suggestions", authMiddleware, async (c) => {
+app.get("/api/inventory/fefo-suggestions", authMiddleware, requirePermission('inventory.view'), async (c) => {
   const itemId = c.req.query('itemId');
   const godownId = c.req.query('godownId');
   const quantity = parseFloat(c.req.query('quantity') || "0");
@@ -880,14 +916,14 @@ app.get("/api/inventory/fefo-suggestions", authMiddleware, async (c) => {
 });
 
 // Transfers
-app.get("/api/transfers", authMiddleware, async (c) => {
+app.get("/api/transfers", authMiddleware, requirePermission('inventory.transfer'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare("SELECT * FROM transfers ORDER BY created_at DESC").all();
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.get("/api/transfers/:id", authMiddleware, async (c) => {
+app.get("/api/transfers/:id", authMiddleware, requirePermission('inventory.transfer'), async (c) => {
   const id = c.req.param("id");
   const transfer = await c.env.DB.prepare("SELECT * FROM transfers WHERE id = ?").bind(id).first();
   if (!transfer) return c.json({ error: "Transfer not found" }, 404);
@@ -972,7 +1008,7 @@ app.post("/api/transfers/:id/receive", authMiddleware, requirePermission('invent
 });
 
 // Adjustments
-app.get("/api/adjustments", authMiddleware, async (c) => {
+app.get("/api/adjustments", authMiddleware, requirePermission('inventory.adjust'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare("SELECT * FROM stock_adjustments ORDER BY created_at DESC").all();
@@ -1031,7 +1067,7 @@ app.post("/api/adjustments/:id/post", authMiddleware, requirePermission('invento
 });
 
 // Dashboard Analytics
-app.get("/api/dashboard/summary", authMiddleware, async (c) => {
+app.get("/api/dashboard/summary", authMiddleware, requirePermission('dashboard.view'), async (c) => {
   const cached = await CacheManager.get(c, 30);
   if (cached) return cached;
   const godownId = c.req.query('godownId');
@@ -1042,7 +1078,7 @@ app.get("/api/dashboard/summary", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(summary), 30);
 });
 
-app.get("/api/dashboard/stock-by-godown", authMiddleware, async (c) => {
+app.get("/api/dashboard/stock-by-godown", authMiddleware, requirePermission('dashboard.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const reportingService = new ReportingService(c.env.DB);
@@ -1050,7 +1086,7 @@ app.get("/api/dashboard/stock-by-godown", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(data), 60);
 });
 
-app.get("/api/dashboard/stock-by-category", authMiddleware, async (c) => {
+app.get("/api/dashboard/stock-by-category", authMiddleware, requirePermission('dashboard.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const reportingService = new ReportingService(c.env.DB);
@@ -1058,7 +1094,7 @@ app.get("/api/dashboard/stock-by-category", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(data), 60);
 });
 
-app.get("/api/dashboard/fast-moving", authMiddleware, async (c) => {
+app.get("/api/dashboard/fast-moving", authMiddleware, requirePermission('dashboard.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const limit = parseInt(c.req.query('limit') || "10");
@@ -1069,7 +1105,7 @@ app.get("/api/dashboard/fast-moving", authMiddleware, async (c) => {
 });
 
 // Reports
-app.get("/api/reports/current-stock", authMiddleware, async (c) => {
+app.get("/api/reports/current-stock", authMiddleware, requirePermission('reports.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const godownId = c.req.query('godownId');
@@ -1096,7 +1132,7 @@ app.get("/api/reports/current-stock", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.get("/api/reports/movements", authMiddleware, async (c) => {
+app.get("/api/reports/movements", authMiddleware, requirePermission('reports.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const { from, to, itemId, godownId, movementType, limit = "50", offset = "0" } = c.req.query();
@@ -1124,7 +1160,7 @@ app.get("/api/reports/movements", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.get("/api/reports/valuation", authMiddleware, async (c) => {
+app.get("/api/reports/valuation", authMiddleware, requirePermission('reports.view'), async (c) => {
   const cached = await CacheManager.get(c, 120);
   if (cached) return cached;
   const groupBy = (c.req.query('groupBy') || 'item') as any;
@@ -1135,7 +1171,7 @@ app.get("/api/reports/valuation", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(data), 120);
 });
 
-app.get("/api/reports/dead-stock", authMiddleware, async (c) => {
+app.get("/api/reports/dead-stock", authMiddleware, requirePermission('reports.view'), async (c) => {
   const cached = await CacheManager.get(c, 120);
   if (cached) return cached;
   const days = parseInt(c.req.query('days') || "90");
@@ -1147,7 +1183,7 @@ app.get("/api/reports/dead-stock", authMiddleware, async (c) => {
 });
 
 // Stock Counts
-app.get("/api/stock-counts", authMiddleware, async (c) => {
+app.get("/api/stock-counts", authMiddleware, requirePermission('stockcount.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare(`
@@ -1169,7 +1205,7 @@ app.post("/api/stock-counts", authMiddleware, requirePermission('inventory.count
   return c.json(result);
 });
 
-app.get("/api/stock-counts/:id", authMiddleware, async (c) => {
+app.get("/api/stock-counts/:id", authMiddleware, requirePermission('stockcount.view'), async (c) => {
   const id = c.req.param('id');
   const session = await c.env.DB.prepare(`
     SELECT s.*, g.name as godown_name FROM stock_count_sessions s 
@@ -1202,7 +1238,7 @@ app.put("/api/stock-counts/items/:itemId", authMiddleware, requirePermission('in
   return c.json({ message: "Item count updated" });
 });
 
-app.post("/api/stock-counts/:id/submit", authMiddleware, async (c) => {
+app.post("/api/stock-counts/:id/submit", authMiddleware, requirePermission('stockcount.submit'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const service = new StockCountService(c.env.DB);
@@ -1234,7 +1270,7 @@ app.post("/api/stock-counts/:id/post", authMiddleware, requirePermission('invent
 });
 
 // Wastage
-app.get("/api/wastage", authMiddleware, async (c) => {
+app.get("/api/wastage", authMiddleware, requirePermission('wastage.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare(`
@@ -1245,7 +1281,7 @@ app.get("/api/wastage", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.get("/api/wastage/analytics", authMiddleware, async (c) => {
+app.get("/api/wastage/analytics", authMiddleware, requirePermission('wastage.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const godownId = c.req.query('godown_id');
@@ -1263,7 +1299,7 @@ app.post("/api/wastage", authMiddleware, requirePermission('inventory.wastage'),
   return c.json(result);
 });
 
-app.get("/api/wastage/:id", authMiddleware, async (c) => {
+app.get("/api/wastage/:id", authMiddleware, requirePermission('wastage.view'), async (c) => {
   const id = c.req.param('id');
   const record = await c.env.DB.prepare("SELECT * FROM wastage_records WHERE id = ?").bind(id).first();
   const { results: items } = await c.env.DB.prepare(`
@@ -1290,7 +1326,7 @@ app.post("/api/wastage/:id/post", authMiddleware, requirePermission('inventory.w
 });
 
 // Expiry Risk
-app.get("/api/expiry/risk", authMiddleware, async (c) => {
+app.get("/api/expiry/risk", authMiddleware, requirePermission('intelligence.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const godownId = c.req.query('godown_id');
@@ -1299,7 +1335,7 @@ app.get("/api/expiry/risk", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(summary), 60);
 });
 
-app.get("/api/expiry/recommendations", authMiddleware, async (c) => {
+app.get("/api/expiry/recommendations", authMiddleware, requirePermission('intelligence.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const godownId = c.req.query('godown_id');
@@ -1309,7 +1345,7 @@ app.get("/api/expiry/recommendations", authMiddleware, async (c) => {
 });
 
 // Discrepancies
-app.get("/api/discrepancies/summary", authMiddleware, async (c) => {
+app.get("/api/discrepancies/summary", authMiddleware, requirePermission('intelligence.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const godownId = c.req.query('godown_id');
@@ -1318,7 +1354,7 @@ app.get("/api/discrepancies/summary", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(summary), 60);
 });
 
-app.get("/api/discrepancies/trends", authMiddleware, async (c) => {
+app.get("/api/discrepancies/trends", authMiddleware, requirePermission('intelligence.view'), async (c) => {
   const cached = await CacheManager.get(c, 120);
   if (cached) return cached;
   const discrepancyService = new DiscrepancyService(c.env.DB);
@@ -1327,21 +1363,21 @@ app.get("/api/discrepancies/trends", authMiddleware, async (c) => {
 });
 
 // Stock Requests
-app.get("/api/requests", authMiddleware, async (c) => {
+app.get("/api/requests", authMiddleware, requirePermission('stock_requests.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare("SELECT * FROM stock_requests ORDER BY created_at DESC").all();
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.get("/api/requests/:id", authMiddleware, async (c) => {
+app.get("/api/requests/:id", authMiddleware, requirePermission('stock_requests.view'), async (c) => {
   const id = c.req.param('id');
   const request = await c.env.DB.prepare("SELECT * FROM stock_requests WHERE id = ?").bind(id).first();
   const { results: items } = await c.env.DB.prepare("SELECT * FROM stock_request_items WHERE stock_request_id = ?").bind(id).all();
   return c.json({ ...request, items });
 });
 
-app.post("/api/requests", authMiddleware, async (c) => {
+app.post("/api/requests", authMiddleware, requirePermission('stock_requests.create'), async (c) => {
   const body = await c.req.json();
   const payload = c.get('jwtPayload') as any;
   const requestService = new StockRequestService(c.env.DB);
@@ -1350,7 +1386,7 @@ app.post("/api/requests", authMiddleware, async (c) => {
   return c.json(result);
 });
 
-app.post("/api/requests/:id/submit", authMiddleware, async (c) => {
+app.post("/api/requests/:id/submit", authMiddleware, requirePermission('stock_requests.create'), async (c) => {
   const id = c.req.param('id');
   const requestService = new StockRequestService(c.env.DB);
   await requestService.submitRequest(id);
@@ -1358,7 +1394,7 @@ app.post("/api/requests/:id/submit", authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
-app.post("/api/requests/:id/approve", authMiddleware, requirePermission('inventory.issue'), async (c) => {
+app.post("/api/requests/:id/approve", authMiddleware, requirePermission('stock_requests.approve'), async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json();
   const payload = c.get('jwtPayload') as any;
@@ -1369,7 +1405,7 @@ app.post("/api/requests/:id/approve", authMiddleware, requirePermission('invento
 });
 
 // KPIs
-app.get("/api/kpi/summary", authMiddleware, async (c) => {
+app.get("/api/kpi/summary", authMiddleware, requirePermission('kpi.view'), async (c) => {
   const cached = await CacheManager.get(c, 30);
   if (cached) return cached;
   const godownId = c.req.query('godown_id');
@@ -1384,7 +1420,7 @@ app.get("/api/kpi/summary", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(summary), 30);
 });
 
-app.get("/api/kpi/turnover", authMiddleware, async (c) => {
+app.get("/api/kpi/turnover", authMiddleware, requirePermission('kpi.view'), async (c) => {
   const cached = await CacheManager.get(c, 120);
   if (cached) return cached;
   const kpiService = new KPIService(c.env.DB);
@@ -1445,7 +1481,7 @@ app.post("/api/notifications/read-all", authMiddleware, async (c) => {
 });
 
 // Alerts
-app.get("/api/alerts/summary", authMiddleware, async (c) => {
+app.get("/api/alerts/summary", authMiddleware, requirePermission('dashboard.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const godownId = c.req.query('godownId');
@@ -1465,7 +1501,7 @@ app.get("/api/alerts/summary", authMiddleware, async (c) => {
 });
 
 // Queries
-app.get("/api/inventory/current-stock", authMiddleware, async (c) => {
+app.get("/api/inventory/current-stock", authMiddleware, requirePermission('inventory.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare(`
@@ -1479,7 +1515,7 @@ app.get("/api/inventory/current-stock", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.get("/api/inventory/batches", authMiddleware, async (c) => {
+app.get("/api/inventory/batches", authMiddleware, requirePermission('inventory.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const itemId = c.req.query('itemId');
@@ -1492,7 +1528,7 @@ app.get("/api/inventory/batches", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.get("/api/inventory/expiry-alerts", authMiddleware, async (c) => {
+app.get("/api/inventory/expiry-alerts", authMiddleware, requirePermission('inventory.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const days = parseInt(c.req.query('days') || "30");
@@ -1509,7 +1545,7 @@ app.get("/api/inventory/expiry-alerts", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.get("/api/inventory/movements", authMiddleware, async (c) => {
+app.get("/api/inventory/movements", authMiddleware, requirePermission('inventory.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare(`
@@ -1523,7 +1559,7 @@ app.get("/api/inventory/movements", authMiddleware, async (c) => {
 });
 
 // --- Phase 4: Barcode & QR Scanning ---
-app.get("/api/items/lookup-by-code", authMiddleware, rateLimiter, async (c) => {
+app.get("/api/items/lookup-by-code", authMiddleware, requirePermission('inventory.view'), rateLimiter, async (c) => {
   const cached = await CacheManager.get(c, 300);
   if (cached) return cached;
   const code = c.req.query('code');
@@ -1534,7 +1570,7 @@ app.get("/api/items/lookup-by-code", authMiddleware, rateLimiter, async (c) => {
   return CacheManager.put(c, c.json(res, item ? 200 : 404), 300);
 });
 
-app.get("/api/batches/lookup-by-code", authMiddleware, rateLimiter, async (c) => {
+app.get("/api/batches/lookup-by-code", authMiddleware, requirePermission('inventory.view'), rateLimiter, async (c) => {
   const code = c.req.query('code');
   if (!code) return c.json({ message: "Code is required" }, 400);
   const service = new BarcodeService(c.env.DB);
@@ -1551,7 +1587,7 @@ app.post("/api/items/:id/barcodes", authMiddleware, requirePermission('inventory
   return c.json(result);
 });
 
-app.get("/api/items/:id/barcodes", authMiddleware, async (c) => {
+app.get("/api/items/:id/barcodes", authMiddleware, requirePermission('inventory.view'), async (c) => {
   const itemId = c.req.param('id');
   const service = new BarcodeService(c.env.DB);
   const results = await service.getItemBarcodes(itemId);
@@ -1599,7 +1635,7 @@ app.get("/api/finance/sales-trend", authMiddleware, requirePermission('finance.v
 });
 
 // Sales Management (Minimal)
-app.post("/api/sales", authMiddleware, async (c) => {
+app.post("/api/sales", authMiddleware, requirePermission('finance.view'), async (c) => {
   const body = await c.req.json();
   const idService = new IdService(c.env.DB);
   const id = await idService.generateId('sal');
@@ -1624,13 +1660,13 @@ app.post("/api/sales", authMiddleware, async (c) => {
   return c.json({ id });
 });
 
-app.get("/api/sales", authMiddleware, async (c) => {
+app.get("/api/sales", authMiddleware, requirePermission('finance.view'), async (c) => {
   const { results } = await c.env.DB.prepare("SELECT * FROM sales_documents ORDER BY sale_date DESC").all();
   return c.json(results);
 });
 
 // --- Phase 4: Smart Alerts ---
-app.get("/api/smart-alerts", authMiddleware, async (c) => {
+app.get("/api/smart-alerts", authMiddleware, requirePermission('intelligence.view'), async (c) => {
   const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const user = c.get('jwtPayload') as any;
@@ -1639,7 +1675,7 @@ app.get("/api/smart-alerts", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(alerts), 60);
 });
 
-app.post("/api/smart-alerts/:id/acknowledge", authMiddleware, async (c) => {
+app.post("/api/smart-alerts/:id/acknowledge", authMiddleware, requirePermission('intelligence.view'), async (c) => {
   const alertId = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const service = new SmartAlertsService(c.env.DB);
@@ -1648,7 +1684,7 @@ app.post("/api/smart-alerts/:id/acknowledge", authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
-app.get("/api/smart-alerts/low-stock-forecast", authMiddleware, async (c) => {
+app.get("/api/smart-alerts/low-stock-forecast", authMiddleware, requirePermission('intelligence.view'), async (c) => {
   const cached = await CacheManager.get(c, 120);
   if (cached) return cached;
   const service = new SmartAlertsService(c.env.DB);
@@ -1656,7 +1692,7 @@ app.get("/api/smart-alerts/low-stock-forecast", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(alerts), 120);
 });
 
-app.get("/api/smart-alerts/expiry-risk", authMiddleware, async (c) => {
+app.get("/api/smart-alerts/expiry-risk", authMiddleware, requirePermission('intelligence.view'), async (c) => {
   const cached = await CacheManager.get(c, 120);
   if (cached) return cached;
   const service = new SmartAlertsService(c.env.DB);
@@ -1664,7 +1700,7 @@ app.get("/api/smart-alerts/expiry-risk", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(alerts), 120);
 });
 
-app.get("/api/smart-alerts/unusual-issues", authMiddleware, async (c) => {
+app.get("/api/smart-alerts/unusual-issues", authMiddleware, requirePermission('intelligence.view'), async (c) => {
   const cached = await CacheManager.get(c, 120);
   if (cached) return cached;
   const service = new SmartAlertsService(c.env.DB);
@@ -1672,7 +1708,7 @@ app.get("/api/smart-alerts/unusual-issues", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(alerts), 120);
 });
 
-app.get("/api/smart-alerts/wastage-anomalies", authMiddleware, async (c) => {
+app.get("/api/smart-alerts/wastage-anomalies", authMiddleware, requirePermission('intelligence.view'), async (c) => {
   const cached = await CacheManager.get(c, 120);
   if (cached) return cached;
   const service = new SmartAlertsService(c.env.DB);

@@ -90,15 +90,83 @@ export class UserService {
   }
 
   async getUserPermissions(userId: string): Promise<string[]> {
-    const query = `
+    // 1. Get permissions from role
+    const rolePermissionsQuery = `
       SELECT p.key
       FROM permissions p
       JOIN role_permissions rp ON p.id = rp.permission_id
       JOIN users u ON u.role_id = rp.role_id
       WHERE u.id = ?
     `;
-    const { results } = await this.db.prepare(query).bind(userId).all();
-    return results.map((r: any) => r.key);
+    const { results: roleResults } = await this.db.prepare(rolePermissionsQuery).bind(userId).all();
+    const rolePermissions = new Set(roleResults.map((r: any) => r.key));
+
+    // 2. Get granted permissions
+    const grantsQuery = `
+      SELECT p.key
+      FROM permissions p
+      JOIN user_permission_grants upg ON p.id = upg.permission_id
+      WHERE upg.user_id = ?
+    `;
+    const { results: grantResults } = await this.db.prepare(grantsQuery).bind(userId).all();
+    grantResults.forEach((r: any) => rolePermissions.add(r.key));
+
+    // 3. Get denied permissions
+    const denialsQuery = `
+      SELECT p.key
+      FROM permissions p
+      JOIN user_permission_denials upd ON p.id = upd.permission_id
+      WHERE upd.user_id = ?
+    `;
+    const { results: denialResults } = await this.db.prepare(denialsQuery).bind(userId).all();
+    denialResults.forEach((r: any) => rolePermissions.delete(r.key));
+
+    return Array.from(rolePermissions) as string[];
+  }
+
+  async getUserPermissionOverrides(userId: string): Promise<{ grants: string[], denials: string[] }> {
+    const grantsQuery = `SELECT p.key FROM permissions p JOIN user_permission_grants upg ON p.id = upg.permission_id WHERE upg.user_id = ?`;
+    const denialsQuery = `SELECT p.key FROM permissions p JOIN user_permission_denials upd ON p.id = upd.permission_id WHERE upd.user_id = ?`;
+    
+    const { results: grants } = await this.db.prepare(grantsQuery).bind(userId).all();
+    const { results: denials } = await this.db.prepare(denialsQuery).bind(userId).all();
+    
+    return {
+      grants: grants.map((r: any) => r.key),
+      denials: denials.map((r: any) => r.key)
+    };
+  }
+
+  async updateUserPermissions(userId: string, grants: string[], denials: string[], updatedBy: string): Promise<void> {
+    // Start a transaction if possible, but D1 batch is better
+    const batch = [];
+    
+    // Clear existing overrides
+    batch.push(this.db.prepare("DELETE FROM user_permission_grants WHERE user_id = ?").bind(userId));
+    batch.push(this.db.prepare("DELETE FROM user_permission_denials WHERE user_id = ?").bind(userId));
+    
+    // Add new grants
+    for (const key of grants) {
+      batch.push(this.db.prepare(`
+        INSERT INTO user_permission_grants (user_id, permission_id, created_by)
+        SELECT ?, id, ? FROM permissions WHERE key = ?
+      `).bind(userId, updatedBy, key));
+    }
+    
+    // Add new denials
+    for (const key of denials) {
+      batch.push(this.db.prepare(`
+        INSERT INTO user_permission_denials (user_id, permission_id, created_by)
+        SELECT ?, id, ? FROM permissions WHERE key = ?
+      `).bind(userId, updatedBy, key));
+    }
+    
+    await this.db.batch(batch);
+  }
+
+  async getAllPermissions(): Promise<{ id: string, key: string, description: string }[]> {
+    const { results } = await this.db.prepare("SELECT * FROM permissions ORDER BY key ASC").all();
+    return results as any[];
   }
 
   async createUser(userData: Partial<User> & { password_hash: string }): Promise<string> {

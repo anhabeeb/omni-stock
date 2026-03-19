@@ -39,12 +39,14 @@ const CurrentStock: React.FC = () => {
   const filtered = stock.filter((s: any) => 
     s.item_name?.toLowerCase().includes(search.toLowerCase()) ||
     s.item_sku?.toLowerCase().includes(search.toLowerCase()) ||
+    s.barcode?.toLowerCase().includes(search.toLowerCase()) ||
     s.godown_name?.toLowerCase().includes(search.toLowerCase())
   );
 
   const exportColumns = [
     { header: 'Item Name', key: 'item_name' },
     { header: 'SKU', key: 'item_sku' },
+    { header: 'Barcode', key: 'barcode' },
     { header: 'Godown', key: 'godown_name' },
     { header: 'Batch Number', key: 'batch_number' },
     { header: 'Expiry Date', key: (row: any) => row.expiry_date ? new Date(row.expiry_date).toLocaleDateString() : '' },

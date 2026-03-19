@@ -20,6 +20,7 @@ export type Status = 'draft' | 'posted' | 'cancelled' | 'approved' | 'dispatched
 export interface Item {
   id: string;
   sku: string;
+  barcode?: string;
   name: string;
   description?: string;
   category_id: number;

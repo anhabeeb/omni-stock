@@ -44,6 +44,167 @@ interface Role {
   description?: string;
 }
 
+interface Permission {
+  id: string;
+  key: string;
+  description: string;
+}
+
+function PermissionManager({ user, onClose }: { user: User, onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const { data: allPermissions = [] } = useQuery<Permission[]>({
+    queryKey: ['all-permissions'],
+    queryFn: async () => {
+      const res = await fetch('/api/permissions', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      return res.json();
+    }
+  });
+
+  const { data: userPermissions, isLoading } = useQuery<{ overrides: { grants: string[], denials: string[] }, effective: string[] }>({
+    queryKey: ['user-permissions', user.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/users/${user.id}/permissions`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      return res.json();
+    }
+  });
+
+  const updatePermissionsMutation = useMutation({
+    mutationFn: async ({ grants, denials }: { grants: string[], denials: string[] }) => {
+      const res = await fetch(`/api/users/${user.id}/permissions`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ grants, denials }),
+      });
+      if (!res.ok) throw new Error('Failed to update permissions');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-permissions', user.id] });
+      alert('Permissions updated successfully');
+    }
+  });
+
+  const [localGrants, setLocalGrants] = useState<string[]>([]);
+  const [localDenials, setLocalDenials] = useState<string[]>([]);
+
+  React.useEffect(() => {
+    if (userPermissions) {
+      setLocalGrants(userPermissions.overrides.grants);
+      setLocalDenials(userPermissions.overrides.denials);
+    }
+  }, [userPermissions]);
+
+  if (isLoading) return <div className="p-8 text-center text-slate-400">Loading permissions...</div>;
+
+  const handleToggleGrant = (key: string) => {
+    if (localGrants.includes(key)) {
+      setLocalGrants(localGrants.filter(k => k !== key));
+    } else {
+      setLocalGrants([...localGrants, key]);
+      setLocalDenials(localDenials.filter(k => k !== key));
+    }
+  };
+
+  const handleToggleDeny = (key: string) => {
+    if (localDenials.includes(key)) {
+      setLocalDenials(localDenials.filter(k => k !== key));
+    } else {
+      setLocalDenials([...localDenials, key]);
+      setLocalGrants(localGrants.filter(k => k !== key));
+    }
+  };
+
+  const handleReset = (key: string) => {
+    setLocalGrants(localGrants.filter(k => k !== key));
+    setLocalDenials(localDenials.filter(k => k !== key));
+  };
+
+  return (
+    <div className="flex flex-col h-[600px]">
+      <div className="p-6 border-b border-slate-800">
+        <h3 className="text-xl font-bold text-white">Manage Permissions: {user.full_name}</h3>
+        <p className="text-slate-400 text-sm mt-1">Role: {user.role_name}</p>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="grid grid-cols-1 gap-4">
+          {allPermissions.map(perm => {
+            const isGranted = localGrants.includes(perm.key);
+            const isDenied = localDenials.includes(perm.key);
+            const isEffective = userPermissions?.effective.includes(perm.key);
+            
+            return (
+              <div key={perm.key} className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 flex items-center justify-between group">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-white">{perm.key}</span>
+                    {isEffective && (
+                      <span className="text-[10px] bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded border border-emerald-500/20">Effective</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500">{perm.description}</p>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleToggleGrant(perm.key)}
+                    className={cn(
+                      "px-3 py-1 rounded-lg text-xs font-medium transition-all",
+                      isGranted ? "bg-emerald-600 text-white" : "bg-slate-800 text-slate-400 hover:text-white"
+                    )}
+                  >
+                    Grant
+                  </button>
+                  <button
+                    onClick={() => handleToggleDeny(perm.key)}
+                    className={cn(
+                      "px-3 py-1 rounded-lg text-xs font-medium transition-all",
+                      isDenied ? "bg-rose-600 text-white" : "bg-slate-800 text-slate-400 hover:text-white"
+                    )}
+                  >
+                    Deny
+                  </button>
+                  {(isGranted || isDenied) && (
+                    <button
+                      onClick={() => handleReset(perm.key)}
+                      className="p-1 text-slate-500 hover:text-white transition-colors"
+                      title="Reset to role default"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      
+      <div className="p-6 border-t border-slate-800 flex gap-3">
+        <button 
+          onClick={onClose}
+          className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-2 rounded-xl transition-colors"
+        >
+          Close
+        </button>
+        <button 
+          onClick={() => updatePermissionsMutation.mutate({ grants: localGrants, denials: localDenials })}
+          disabled={updatePermissionsMutation.isPending}
+          className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all"
+        >
+          {updatePermissionsMutation.isPending ? 'Saving...' : 'Save Changes'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function RoleCard({ role }: { role: Role }) {
   const { data: permissions = [], isLoading } = useQuery<string[]>({
     queryKey: ['role-permissions', role.id],
@@ -86,6 +247,8 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [resettingUser, setResettingUser] = useState<User | null>(null);
+  const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false);
+  const [managingUser, setManagingUser] = useState<User | null>(null);
 
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
@@ -307,6 +470,15 @@ export default function UsersPage() {
                           >
                             <Lock size={16} />
                           </button>
+                          {hasPermission('users.permissions.manage') && (
+                            <button 
+                              onClick={() => { setManagingUser(user); setIsPermissionModalOpen(true); }}
+                              className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                              title="Manage Permissions"
+                            >
+                              <Shield size={16} />
+                            </button>
+                          )}
                           {hasPermission('onboarding.reset') && (
                             <button 
                               onClick={async () => {
@@ -542,6 +714,27 @@ export default function UsersPage() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Permission Manager Modal */}
+      <AnimatePresence>
+        {isPermissionModalOpen && managingUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl"
+            >
+              <PermissionManager 
+                user={managingUser} 
+                onClose={() => {
+                  setIsPermissionModalOpen(false);
+                  setManagingUser(null);
+                }} 
+              />
             </motion.div>
           </div>
         )}

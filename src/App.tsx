@@ -180,7 +180,9 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
 
         <nav className="flex-1 px-3 space-y-1 mt-4 overflow-y-auto custom-scrollbar">
           <div className="px-4 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">General</div>
-          <SidebarItem icon={LayoutDashboard} label="Dashboard" to="/" active={location.pathname === "/"} />
+          <PermissionGate user={user} permission="dashboard.view">
+            <SidebarItem icon={LayoutDashboard} label="Dashboard" to="/" active={location.pathname === "/"} />
+          </PermissionGate>
           
           <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Reports & Analytics</div>
           <PermissionGate user={user} permission="analytics.view">
@@ -207,7 +209,9 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
 
           <PermissionGate user={user} permission="intelligence.view">
             <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Warehouse Intelligence</div>
-            <SidebarItem icon={BarChart3} label="Warehouse KPIs" to="/intelligence/kpis" active={location.pathname === "/intelligence/kpis"} />
+            <PermissionGate user={user} permission="kpi.view">
+              <SidebarItem icon={BarChart3} label="Warehouse KPIs" to="/intelligence/kpis" active={location.pathname === "/intelligence/kpis"} />
+            </PermissionGate>
             <SidebarItem icon={Trash2} label="Wastage Analytics" to="/intelligence/wastage" active={location.pathname === "/intelligence/wastage"} />
             <SidebarItem icon={Clock} label="Expiry Risk" to="/intelligence/expiry" active={location.pathname === "/intelligence/expiry"} />
             <SidebarItem icon={AlertTriangle} label="Shrinkage Analytics" to="/intelligence/shrinkage" active={location.pathname === "/intelligence/shrinkage"} />
@@ -328,32 +332,32 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
               >
                 <Routes>
                   <Route path="/" element={<DashboardPage />} />
-                  <Route path="/analytics" element={<AnalyticsDashboard />} />
-                  <Route path="/reports" element={<Reports />} />
-                  <Route path="/alerts" element={<Alerts />} />
-                  <Route path="/smart-alerts" element={<SmartAlertsCenter />} />
-                  <Route path="/finance" element={<FinanceDashboard />} />
-                  <Route path="/stock-count" element={<StockCount />} />
-                  <Route path="/wastage" element={<Wastage />} />
-                  <Route path="/grn/new" element={<GRNForm />} />
-                  <Route path="/issues/new" element={<StockIssueForm />} />
-                  <Route path="/transfers/new" element={<TransferForm />} />
-                  <Route path="/adjustments/new" element={<AdjustmentForm />} />
-                  <Route path="/stock" element={<BatchStock />} />
-                  <Route path="/expiry" element={<ExpiryAlerts />} />
-                  <Route path="/ledger" element={<MovementLedger />} />
+                  <Route path="/analytics" element={<PermissionGate user={user} permission="analytics.view"><AnalyticsDashboard /></PermissionGate>} />
+                  <Route path="/reports" element={<PermissionGate user={user} permission="reports.view"><Reports /></PermissionGate>} />
+                  <Route path="/alerts" element={<PermissionGate user={user} permission="alerts.view"><Alerts /></PermissionGate>} />
+                  <Route path="/smart-alerts" element={<PermissionGate user={user} permission="alerts.view"><SmartAlertsCenter /></PermissionGate>} />
+                  <Route path="/finance" element={<PermissionGate user={user} permission="finance.view"><FinanceDashboard /></PermissionGate>} />
+                  <Route path="/stock-count" element={<PermissionGate user={user} permission="inventory.count"><StockCount /></PermissionGate>} />
+                  <Route path="/wastage" element={<PermissionGate user={user} permission="inventory.wastage"><Wastage /></PermissionGate>} />
+                  <Route path="/grn/new" element={<PermissionGate user={user} permission="inventory.grn"><GRNForm /></PermissionGate>} />
+                  <Route path="/issues/new" element={<PermissionGate user={user} permission="inventory.issue"><StockIssueForm /></PermissionGate>} />
+                  <Route path="/transfers/new" element={<PermissionGate user={user} permission="inventory.transfer"><TransferForm /></PermissionGate>} />
+                  <Route path="/adjustments/new" element={<PermissionGate user={user} permission="inventory.adjust"><AdjustmentForm /></PermissionGate>} />
+                  <Route path="/stock" element={<PermissionGate user={user} permission="inventory.view"><BatchStock /></PermissionGate>} />
+                  <Route path="/expiry" element={<PermissionGate user={user} permission="inventory.view"><ExpiryAlerts /></PermissionGate>} />
+                  <Route path="/ledger" element={<PermissionGate user={user} permission="inventory.view"><MovementLedger /></PermissionGate>} />
                   
                   {/* Phase 5 Routes */}
-                  <Route path="/intelligence/kpis" element={<KPIDashboard />} />
-                  <Route path="/intelligence/wastage" element={<WastageAnalytics />} />
-                  <Route path="/intelligence/expiry" element={<ExpiryRiskDashboard />} />
-                  <Route path="/intelligence/shrinkage" element={<DiscrepancyAnalytics />} />
-                  <Route path="/requests" element={<StockRequestList onNewRequest={() => window.location.href = '/requests/new'} onViewRequest={(id) => window.location.href = `/requests/${id}`} />} />
-                  <Route path="/requests/new" element={<StockRequestForm onClose={() => window.location.href = '/requests'} onSuccess={() => window.location.href = '/requests'} />} />
-                  <Route path="/requests/:id" element={<StockRequestForm requestId={window.location.pathname.split('/').pop()} onClose={() => window.location.href = '/requests'} onSuccess={() => window.location.href = '/requests'} />} />
+                  <Route path="/intelligence/kpis" element={<PermissionGate user={user} permission="kpi.view"><KPIDashboard /></PermissionGate>} />
+                  <Route path="/intelligence/wastage" element={<PermissionGate user={user} permission="wastage.view"><WastageAnalytics /></PermissionGate>} />
+                  <Route path="/intelligence/expiry" element={<PermissionGate user={user} permission="intelligence.view"><ExpiryRiskDashboard /></PermissionGate>} />
+                  <Route path="/intelligence/shrinkage" element={<PermissionGate user={user} permission="intelligence.view"><DiscrepancyAnalytics /></PermissionGate>} />
+                  <Route path="/requests" element={<PermissionGate user={user} permission="stock_requests.view"><StockRequestList onNewRequest={() => window.location.href = '/requests/new'} onViewRequest={(id) => window.location.href = `/requests/${id}`} /></PermissionGate>} />
+                  <Route path="/requests/new" element={<PermissionGate user={user} permission="stock_requests.create"><StockRequestForm onClose={() => window.location.href = '/requests'} onSuccess={() => window.location.href = '/requests'} /></PermissionGate>} />
+                  <Route path="/requests/:id" element={<PermissionGate user={user} permission="stock_requests.view"><StockRequestForm requestId={window.location.pathname.split('/').pop()} onClose={() => window.location.href = '/requests'} onSuccess={() => window.location.href = '/requests'} /></PermissionGate>} />
 
-                  <Route path="/users" element={<UsersPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/users" element={<PermissionGate user={user} permission="users.view"><UsersPage /></PermissionGate>} />
+                  <Route path="/settings" element={<PermissionGate user={user} permission="settings.view"><SettingsPage /></PermissionGate>} />
 
                   <Route path="/items" element={
                     <MasterListPage 
@@ -368,6 +372,7 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
                       }}
                       columns={[
                         { key: "sku", label: "SKU", required: true },
+                        { key: "barcode", label: "Barcode" },
                         { key: "name", label: "Item Name", required: true },
                         { key: "description", label: "Description", type: "textarea", hideInTable: true },
                         { key: "category_id", label: "Category ID", type: "number", hideInTable: true },

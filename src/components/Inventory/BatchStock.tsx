@@ -47,12 +47,15 @@ const BatchStock: React.FC = () => {
 
   const filteredStock = stock.filter((s: any) => 
     s.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.item_sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.barcode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.batch_number?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const exportColumns = [
     { header: 'Item Name', key: 'item_name' },
     { header: 'SKU', key: 'item_sku' },
+    { header: 'Barcode', key: 'barcode' },
     { header: 'Godown', key: 'godown_name' },
     { header: 'Batch #', key: 'batch_number' },
     { header: 'Expiry', key: 'expiry_date' },
