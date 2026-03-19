@@ -1,17 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ArrowDownLeft, ArrowUpRight, RefreshCw, Search, Trash2, 
-  ChevronRight, ScanLine, Package, Warehouse, MapPin
+  ChevronRight, ScanLine, Package, Warehouse, MapPin, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function MobileOperations({ onAction }: { onAction: (action: string) => void }) {
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (permission: string) => {
+    if (currentUser.role === 'super_admin') return true;
+    return currentUser.permissions?.includes(permission);
+  };
+  const canView = hasPermission('operations.view');
+
+  if (!canView) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 bg-slate-900 rounded-3xl border border-slate-800 p-8 text-center m-4">
+        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+        </div>
+        <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
+        <p className="text-slate-400 max-w-md">
+          You do not have permission to view operations.
+        </p>
+      </div>
+    );
+  }
+
   const operations = [
-    { id: 'grn', label: 'Receive Stock', sub: 'GRN', icon: ArrowDownLeft, color: 'emerald' },
-    { id: 'issue', label: 'Issue to Outlet', sub: 'Issue', icon: ArrowUpRight, color: 'blue' },
-    { id: 'transfer', label: 'Transfer Stock', sub: 'Transfer', icon: RefreshCw, color: 'violet' },
-    { id: 'stock-count', label: 'Stock Count', sub: 'Audit', icon: Search, color: 'amber' },
-    { id: 'wastage', label: 'Wastage Entry', sub: 'Loss', icon: Trash2, color: 'rose' },
+    { id: 'grn', label: 'Receive Stock', sub: 'GRN', icon: ArrowDownLeft, color: 'emerald', permission: 'inventory.grn' },
+    { id: 'issue', label: 'Issue to Outlet', sub: 'Issue', icon: ArrowUpRight, color: 'blue', permission: 'inventory.issue' },
+    { id: 'transfer', label: 'Transfer Stock', sub: 'Transfer', icon: RefreshCw, color: 'violet', permission: 'inventory.transfer' },
+    { id: 'stock-count', label: 'Stock Count', sub: 'Audit', icon: Search, color: 'amber', permission: 'inventory.count' },
+    { id: 'wastage', label: 'Wastage Entry', sub: 'Loss', icon: Trash2, color: 'rose', permission: 'inventory.wastage' },
   ];
 
   return (
@@ -22,7 +43,7 @@ export default function MobileOperations({ onAction }: { onAction: (action: stri
       </div>
 
       <div className="grid grid-cols-1 gap-2">
-        {operations.map(op => (
+        {operations.filter(op => !op.permission || hasPermission(op.permission)).map(op => (
           <button
             key={op.id}
             onClick={() => onAction(op.id)}

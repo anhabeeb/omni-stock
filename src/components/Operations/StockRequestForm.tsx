@@ -29,6 +29,10 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({ requestId, o
   const [request, setRequest] = useState<StockRequest | null>(null);
   const [showPrintModal, setShowPrintModal] = useState(false);
 
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('operations.view');
+
   const [formData, setFormData] = useState({
     outlet_id: '',
     requested_date: new Date().toISOString().split('T')[0],
@@ -37,21 +41,37 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({ requestId, o
   });
 
   useEffect(() => {
-    fetchData();
-  }, [requestId]);
+    if (canView) {
+      fetchData();
+    } else {
+      setLoading(false);
+    }
+  }, [requestId, canView]);
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view or create stock requests.</p>
+        </div>
+      </div>
+    );
+  }
 
   const fetchData = async () => {
     try {
       const [itemsRes, outletsRes] = await Promise.all([
-        fetch('/api/items'),
-        fetch('/api/outlets')
+        fetch('/api/items', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
+        fetch('/api/outlets', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
       ]);
       
       if (itemsRes.ok) setItems(await itemsRes.json());
       if (outletsRes.ok) setOutlets(await outletsRes.json());
 
       if (requestId) {
-        const reqRes = await fetch(`/api/requests/${requestId}`);
+        const reqRes = await fetch(`/api/requests/${requestId}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
         if (reqRes.ok) {
           const data = await reqRes.json() as StockRequest;
           setRequest(data);
@@ -97,7 +117,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({ requestId, o
   const handleAction = async (action: 'submit' | 'approve' | 'fulfill' | 'cancel') => {
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/requests/${requestId}/${action}`, { method: 'POST' });
+      const res = await fetch(`/api/requests/${requestId}/${action}`, { method: 'POST' , headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
       if (res.ok) {
         onSuccess();
       } else {
@@ -124,7 +144,10 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({ requestId, o
       
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
         body: JSON.stringify(formData)
       });
 
@@ -133,7 +156,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({ requestId, o
         const currentId = requestId || result.id;
         
         if (submit) {
-          await fetch(`/api/requests/${currentId}/submit`, { method: 'POST' });
+          await fetch(`/api/requests/${currentId}/submit`, { method: 'POST' , headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
         }
         
         onSuccess();

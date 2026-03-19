@@ -80,6 +80,7 @@ const StockRequestForm = lazy(() => import("./components/Operations/StockRequest
 const NotificationCenter = lazy(() => import("./components/Layout/NotificationCenter").then(m => ({ default: m.NotificationCenter })));
 
 import { LoadingSkeleton, TableSkeleton } from "./components/Common/LoadingSkeleton";
+import { MasterListPage } from "./components/MasterData/MasterListPage";
 
 // --- Utils ---
 function useWindowSize() {
@@ -194,15 +195,23 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
             <SidebarItem icon={AlertCircle} label="Smart Alerts" to="/smart-alerts" active={location.pathname === "/smart-alerts"} />
           </PermissionGate>
           
-          <SidebarItem icon={FileText} label="Advanced Reports" to="/reports" active={location.pathname === "/reports"} />
-          <SidebarItem icon={AlertTriangle} label="System Alerts" to="/alerts" active={location.pathname === "/alerts"} />
-          <SidebarItem icon={History} label="Movement Ledger" to="/ledger" active={location.pathname === "/ledger"} />
+          <PermissionGate user={user} permission="reports.view">
+            <SidebarItem icon={FileText} label="Advanced Reports" to="/reports" active={location.pathname === "/reports"} />
+          </PermissionGate>
+          <PermissionGate user={user} permission="alerts.view">
+            <SidebarItem icon={AlertTriangle} label="System Alerts" to="/alerts" active={location.pathname === "/alerts"} />
+          </PermissionGate>
+          <PermissionGate user={user} permission="inventory.view">
+            <SidebarItem icon={History} label="Movement Ledger" to="/ledger" active={location.pathname === "/ledger"} />
+          </PermissionGate>
 
-          <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Warehouse Intelligence</div>
-          <SidebarItem icon={BarChart3} label="Warehouse KPIs" to="/intelligence/kpis" active={location.pathname === "/intelligence/kpis"} />
-          <SidebarItem icon={Trash2} label="Wastage Analytics" to="/intelligence/wastage" active={location.pathname === "/intelligence/wastage"} />
-          <SidebarItem icon={Clock} label="Expiry Risk" to="/intelligence/expiry" active={location.pathname === "/intelligence/expiry"} />
-          <SidebarItem icon={AlertTriangle} label="Shrinkage Analytics" to="/intelligence/shrinkage" active={location.pathname === "/intelligence/shrinkage"} />
+          <PermissionGate user={user} permission="intelligence.view">
+            <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Warehouse Intelligence</div>
+            <SidebarItem icon={BarChart3} label="Warehouse KPIs" to="/intelligence/kpis" active={location.pathname === "/intelligence/kpis"} />
+            <SidebarItem icon={Trash2} label="Wastage Analytics" to="/intelligence/wastage" active={location.pathname === "/intelligence/wastage"} />
+            <SidebarItem icon={Clock} label="Expiry Risk" to="/intelligence/expiry" active={location.pathname === "/intelligence/expiry"} />
+            <SidebarItem icon={AlertTriangle} label="Shrinkage Analytics" to="/intelligence/shrinkage" active={location.pathname === "/intelligence/shrinkage"} />
+          </PermissionGate>
 
           <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Warehouse Control</div>
           <PermissionGate user={user} permission="stock_requests.view">
@@ -230,10 +239,18 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
           </PermissionGate>
 
           <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Master Data</div>
-          <SidebarItem icon={Package} label="Items" to="/items" active={location.pathname === "/items"} />
-          <SidebarItem icon={Truck} label="Suppliers" to="/suppliers" active={location.pathname === "/suppliers"} />
-          <SidebarItem icon={Warehouse} label="Godowns" to="/godowns" active={location.pathname === "/godowns"} />
-          <SidebarItem icon={Store} label="Outlets" to="/outlets" active={location.pathname === "/outlets"} />
+          <PermissionGate user={user} permission="master.items.view">
+            <SidebarItem icon={Package} label="Items" to="/items" active={location.pathname === "/items"} />
+          </PermissionGate>
+          <PermissionGate user={user} permission="master.suppliers.view">
+            <SidebarItem icon={Truck} label="Suppliers" to="/suppliers" active={location.pathname === "/suppliers"} />
+          </PermissionGate>
+          <PermissionGate user={user} permission="master.godowns.view">
+            <SidebarItem icon={Warehouse} label="Godowns" to="/godowns" active={location.pathname === "/godowns"} />
+          </PermissionGate>
+          <PermissionGate user={user} permission="master.outlets.view">
+            <SidebarItem icon={Store} label="Outlets" to="/outlets" active={location.pathname === "/outlets"} />
+          </PermissionGate>
           
           <PermissionGate user={user} permission="users.view">
             <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Administration</div>
@@ -247,8 +264,6 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
           <div className="pt-4 pb-2 px-4">
             <div className={cn("h-px", theme === 'dark' ? "bg-slate-800" : "bg-slate-200")} />
           </div>
-          <SidebarItem icon={Users} label="Users" to="/users" active={location.pathname === "/users"} />
-          <SidebarItem icon={Settings} label="Settings" to="/settings" active={location.pathname === "/settings"} />
         </nav>
 
         <div className={cn("p-4 border-t", theme === 'dark' ? "border-slate-800" : "border-slate-200")}>
@@ -344,10 +359,26 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
                     <MasterListPage 
                       title="Items Master" 
                       endpoint="items" 
+                      user={user}
+                      permissions={{
+                        view: 'master.items.view',
+                        create: 'master.items.create',
+                        update: 'master.items.update',
+                        delete: 'master.items.deactivate'
+                      }}
                       columns={[
-                        { key: "sku", label: "SKU" },
-                        { key: "name", label: "Item Name" },
-                        { key: "reorder_level", label: "Reorder Level" }
+                        { key: "sku", label: "SKU", required: true },
+                        { key: "name", label: "Item Name", required: true },
+                        { key: "description", label: "Description", type: "textarea", hideInTable: true },
+                        { key: "category_id", label: "Category ID", type: "number", hideInTable: true },
+                        { key: "base_unit_id", label: "Base Unit ID", type: "number", hideInTable: true },
+                        { key: "is_perishable", label: "Perishable", type: "checkbox", hideInTable: true },
+                        { key: "track_batches", label: "Track Batches", type: "checkbox", hideInTable: true },
+                        { key: "track_expiry", label: "Track Expiry", type: "checkbox", hideInTable: true },
+                        { key: "reorder_level", label: "Reorder Level", type: "number" },
+                        { key: "min_stock", label: "Min Stock", type: "number", hideInTable: true },
+                        { key: "max_stock", label: "Max Stock", type: "number", hideInTable: true },
+                        { key: "is_active", label: "Active", type: "checkbox" }
                       ]} 
                     />
                   } />
@@ -355,10 +386,21 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
                     <MasterListPage 
                       title="Suppliers" 
                       endpoint="suppliers" 
+                      user={user}
+                      permissions={{
+                        view: 'master.suppliers.view',
+                        create: 'master.suppliers.create',
+                        update: 'master.suppliers.update',
+                        delete: 'master.suppliers.deactivate'
+                      }}
                       columns={[
-                        { key: "code", label: "Code" },
-                        { key: "name", label: "Supplier Name" },
-                        { key: "phone", label: "Phone" }
+                        { key: "code", label: "Code", required: true },
+                        { key: "name", label: "Supplier Name", required: true },
+                        { key: "contact_person", label: "Contact Person" },
+                        { key: "email", label: "Email", type: "email", hideInTable: true },
+                        { key: "phone", label: "Phone" },
+                        { key: "address", label: "Address", type: "textarea", hideInTable: true },
+                        { key: "is_active", label: "Active", type: "checkbox" }
                       ]} 
                     />
                   } />
@@ -366,9 +408,18 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
                     <MasterListPage 
                       title="Godowns" 
                       endpoint="godowns" 
+                      user={user}
+                      permissions={{
+                        view: 'master.godowns.view',
+                        create: 'master.godowns.create',
+                        update: 'master.godowns.update',
+                        delete: 'master.godowns.deactivate'
+                      }}
                       columns={[
-                        { key: "code", label: "Code" },
-                        { key: "name", label: "Godown Name" }
+                        { key: "code", label: "Code", required: true },
+                        { key: "name", label: "Godown Name", required: true },
+                        { key: "address", label: "Address", type: "textarea", hideInTable: true },
+                        { key: "is_active", label: "Active", type: "checkbox" }
                       ]} 
                     />
                   } />
@@ -376,9 +427,19 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
                     <MasterListPage 
                       title="Outlets" 
                       endpoint="outlets" 
+                      user={user}
+                      permissions={{
+                        view: 'master.outlets.view',
+                        create: 'master.outlets.create',
+                        update: 'master.outlets.update',
+                        delete: 'master.outlets.deactivate'
+                      }}
                       columns={[
-                        { key: "code", label: "Code" },
-                        { key: "name", label: "Outlet Name" }
+                        { key: "code", label: "Code", required: true },
+                        { key: "name", label: "Outlet Name", required: true },
+                        { key: "address", label: "Address", type: "textarea", hideInTable: true },
+                        { key: "manager_id", label: "Manager ID", hideInTable: true },
+                        { key: "is_active", label: "Active", type: "checkbox" }
                       ]} 
                     />
                   } />
@@ -405,7 +466,7 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User, token: string) => void }
   const handleSetup = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/setup/init", { method: "POST" });
+      const res = await fetch("/api/setup/init", { method: "POST" , headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
       const data = await res.json() as any;
       if (res.ok) {
         setSetupMessage("Database initialized! You can now login.");
@@ -426,7 +487,7 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User, token: string) => void }
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}`,  "Content-Type": "application/json" },
         body: JSON.stringify({ username, password })
       });
       const data = await res.json() as any;
@@ -515,6 +576,14 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User, token: string) => void }
 
 const DashboardPage = () => {
   const { format } = useSettings();
+
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (permission: string) => {
+    if (currentUser.role === 'super_admin') return true;
+    return currentUser.permissions?.includes(permission);
+  };
+  const canView = hasPermission('dashboard.view');
+
   const { data: stats, isLoading: statsLoading } = useQuery<{
     totalStockValue: number;
     totalItems: number;
@@ -532,6 +601,7 @@ const DashboardPage = () => {
     },
     staleTime: 60000, // 60 seconds
     gcTime: 1000 * 60 * 10, // 10 minutes
+    enabled: canView,
   });
 
   const { data: recentMovements = [], isLoading: movementsLoading } = useQuery<any[]>({
@@ -547,7 +617,22 @@ const DashboardPage = () => {
     },
     staleTime: 60000, // 60 seconds
     gcTime: 1000 * 60 * 10, // 10 minutes
+    enabled: canView,
   });
+
+  if (!canView) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 bg-slate-900 rounded-3xl border border-slate-800 p-8 text-center">
+        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+        </div>
+        <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
+        <p className="text-slate-400 max-w-md">
+          You do not have permission to view the dashboard. Please contact your system administrator if you believe this is an error.
+        </p>
+      </div>
+    );
+  }
 
   if (statsLoading || movementsLoading) return (
     <div className="animate-pulse space-y-8">
@@ -665,91 +750,6 @@ const StatCard = ({ icon: Icon, label, value, color }: { icon: any, label: strin
       </div>
       <p className="text-slate-400 text-sm font-medium">{label}</p>
       <p className="text-2xl font-bold text-white mt-1">{value}</p>
-    </div>
-  );
-};
-
-const MasterListPage = ({ title, endpoint, columns }: { title: string, endpoint: string, columns: any[] }) => {
-  const { data = [], isLoading } = useQuery<any[]>({
-    queryKey: ["master-data", endpoint],
-    queryFn: async () => {
-      const res = await fetch(`/api/${endpoint}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-      });
-      if (!res.ok) throw new Error(`Failed to fetch ${endpoint}`);
-      return res.json();
-    },
-    staleTime: 1000 * 60 * 15, // 15 minutes
-    gcTime: 1000 * 60 * 30, // 30 minutes
-  });
-
-  if (isLoading) return <TableSkeleton />;
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">{title}</h2>
-        <button className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2">
-          <Plus size={18} />
-          <span>Add New</span>
-        </button>
-      </div>
-
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden">
-        <div className="p-4 border-b border-slate-800 flex items-center gap-4 bg-slate-900/50">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-            <input 
-              type="text" 
-              placeholder={`Search ${title.toLowerCase()}...`}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 py-2 text-sm text-white focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-            />
-          </div>
-          <button className="p-2 hover:bg-slate-800 rounded-xl text-slate-400 border border-slate-700">
-            <Filter size={18} />
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-800/50">
-                {columns.map(col => (
-                  <th key={col.key} className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    {col.label}
-                  </th>
-                ))}
-                <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {isLoading ? (
-                [1,2,3,4,5].map(i => (
-                  <tr key={i} className="animate-pulse">
-                    {columns.map(col => (
-                      <td key={col.key} className="px-6 py-4"><div className="h-4 bg-slate-800 rounded w-24" /></td>
-                    ))}
-                    <td className="px-6 py-4"><div className="h-4 bg-slate-800 rounded w-8 ml-auto" /></td>
-                  </tr>
-                ))
-              ) : data.map((item: any, i: number) => (
-                <tr key={i} className="hover:bg-slate-800/30 transition-colors group">
-                  {columns.map(col => (
-                    <td key={col.key} className="px-6 py-4 text-sm text-slate-300">
-                      {item[col.key]}
-                    </td>
-                  ))}
-                  <td className="px-6 py-4 text-right">
-                    <button className="p-2 hover:bg-slate-700 rounded-lg text-slate-500 hover:text-white transition-colors">
-                      <MoreVertical size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 };

@@ -20,6 +20,10 @@ export default function Wastage() {
   const [activeRecordId, setActiveRecordId] = useState<string | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const [printDoc, setPrintDoc] = useState<any>(null);
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('inventory.view');
+
   const [newRecord, setNewRecord] = useState({
     godown_id: '',
     wastage_date: new Date().toISOString().split('T')[0],
@@ -38,8 +42,21 @@ export default function Wastage() {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       return res.json();
-    }
+    },
+    enabled: canView
   });
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view wastage records.</p>
+        </div>
+      </div>
+    );
+  }
 
   const handlePrintDoc = async (record: any) => {
     try {

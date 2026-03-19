@@ -15,6 +15,10 @@ type ReportType = 'stock' | 'movements' | 'valuation' | 'wastage' | 'expiry';
 
 export default function Reports() {
   const { format } = useSettings();
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('reports.view');
+
   const [activeReport, setActiveReport] = useState<ReportType>('stock');
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -29,6 +33,7 @@ export default function Reports() {
   });
 
   const fetchMasters = async () => {
+    if (!canView) return;
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
     const [gRes, cRes] = await Promise.all([
@@ -40,6 +45,7 @@ export default function Reports() {
   };
 
   const fetchReport = async () => {
+    if (!canView) return;
     setLoading(true);
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
@@ -66,11 +72,23 @@ export default function Reports() {
 
   useEffect(() => {
     fetchMasters();
-  }, []);
+  }, [canView]);
 
   useEffect(() => {
     fetchReport();
-  }, [activeReport, filters.godownId, filters.categoryId, filters.groupBy]);
+  }, [activeReport, filters.godownId, filters.categoryId, filters.groupBy, canView]);
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <FileText className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view reports.</p>
+        </div>
+      </div>
+    );
+  }
 
   const getExportColumns = () => {
     switch(activeReport) {

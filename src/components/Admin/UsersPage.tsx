@@ -90,6 +90,8 @@ export default function UsersPage() {
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
 
+  const canView = hasPermission('users.view');
+
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ['users', search, roleFilter, statusFilter],
     queryFn: async () => {
@@ -103,7 +105,8 @@ export default function UsersPage() {
       });
       if (!res.ok) throw new Error('Failed to fetch users');
       return res.json();
-    }
+    },
+    enabled: canView
   });
 
   const { data: roles = [] } = useQuery<Role[]>({
@@ -114,8 +117,20 @@ export default function UsersPage() {
       });
       if (!res.ok) throw new Error('Failed to fetch roles');
       return res.json();
-    }
+    },
+    enabled: canView
   });
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-slate-300 mb-2">Access Denied</h2>
+          <p className="text-slate-500">You do not have permission to view this page.</p>
+        </div>
+      </div>
+    );
+  }
 
   const toggleStatusMutation = useMutation({
     mutationFn: async ({ id, active }: { id: string, active: boolean }) => {
@@ -485,7 +500,7 @@ export default function UsersPage() {
                   
                   const res = await fetch(`/api/users/${resettingUser.id}/reset-password`, {
                     method: 'POST',
-                    headers: {
+                    headers: { 
                       'Content-Type': 'application/json',
                       Authorization: `Bearer ${localStorage.getItem('token')}`
                     },

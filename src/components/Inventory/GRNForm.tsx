@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, Save, ArrowLeft, Scan } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeft, Scan, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import BarcodeScanModal from '../Common/BarcodeScanModal';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -12,6 +12,10 @@ const GRNForm: React.FC = () => {
   const queryClient = useQueryClient();
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
   
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('inventory.grn');
+
   const [formData, setFormData] = useState({
     grn_number: `GRN-${Date.now()}`,
     supplier_id: '',
@@ -23,27 +27,43 @@ const GRNForm: React.FC = () => {
 
   const { data: suppliers = [] } = useQuery<any[]>({
     queryKey: ["master-data", "suppliers"],
-    queryFn: () => fetch('/api/suppliers').then(res => res.json()),
+    queryFn: () => fetch('/api/suppliers', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
+    enabled: canView,
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: godowns = [] } = useQuery<any[]>({
     queryKey: ["master-data", "godowns"],
-    queryFn: () => fetch('/api/godowns').then(res => res.json()),
+    queryFn: () => fetch('/api/godowns', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
+    enabled: canView,
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: items = [] } = useQuery<any[]>({
     queryKey: ["master-data", "items"],
-    queryFn: () => fetch('/api/items').then(res => res.json()),
+    queryFn: () => fetch('/api/items', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
+    enabled: canView,
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: units = [] } = useQuery<any[]>({
     queryKey: ["master-data", "units"],
-    queryFn: () => fetch('/api/units').then(res => res.json()),
+    queryFn: () => fetch('/api/units', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
+    enabled: canView,
     staleTime: 1000 * 60 * 10,
   });
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view or create GRNs.</p>
+        </div>
+      </div>
+    );
+  }
 
   const mutation = useMutation({
     mutationFn: async (data: any) => {

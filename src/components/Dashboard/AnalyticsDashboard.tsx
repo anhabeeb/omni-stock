@@ -18,6 +18,10 @@ const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
 
 export default function AnalyticsDashboard() {
   const { format } = useSettings();
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('dashboard.view');
+
   const [summary, setSummary] = useState<any>(null);
   const [stockByGodown, setStockByGodown] = useState<any[]>([]);
   const [stockByCategory, setStockByCategory] = useState<any[]>([]);
@@ -31,6 +35,10 @@ export default function AnalyticsDashboard() {
   });
 
   const fetchData = async () => {
+    if (!canView) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
@@ -59,7 +67,19 @@ export default function AnalyticsDashboard() {
 
   useEffect(() => {
     fetchData();
-  }, [filters.godownId]); // Refresh on godown change
+  }, [filters.godownId, canView]); // Refresh on godown change
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view the dashboard.</p>
+        </div>
+      </div>
+    );
+  }
 
   const exportColumns = [
     { header: 'Metric', key: 'metric' },

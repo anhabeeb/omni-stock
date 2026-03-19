@@ -29,7 +29,7 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({ entityType
 
   const fetchAttachments = async () => {
     try {
-      const res = await fetch(`/api/attachments/${entityType}/${entityId}`);
+      const res = await fetch(`/api/attachments/${entityType}/${entityId}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
       if (res.ok) setAttachments(await res.json());
     } catch (error) {
       console.error('Error fetching attachments:', error);
@@ -52,7 +52,7 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({ entityType
       const res = await fetch('/api/attachments/upload', {
         method: 'POST',
         body: formData
-      });
+      , headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
 
       if (res.ok) {
         await fetchAttachments();
@@ -72,7 +72,7 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({ entityType
     if (!confirm('Are you sure you want to delete this attachment?')) return;
 
     try {
-      const res = await fetch(`/api/attachments/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/attachments/${id}`, { method: 'DELETE' , headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
       if (res.ok) {
         setAttachments(attachments.filter(a => a.id !== id));
       }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, Save, ArrowLeft, Search } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeft, Search, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useSettings } from '../../contexts/SettingsContext';
 
@@ -11,6 +11,10 @@ const AdjustmentForm: React.FC = () => {
   const { format } = useSettings();
   const [batches, setBatches] = useState<any[]>([]);
   
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('inventory.adjust');
+
   const [formData, setFormData] = useState({
     adjustment_number: `ADJ-${Date.now()}`,
     godown_id: '',
@@ -22,21 +26,36 @@ const AdjustmentForm: React.FC = () => {
 
   const { data: godowns = [] } = useQuery<any[]>({
     queryKey: ["master-data", "godowns"],
-    queryFn: () => fetch('/api/godowns').then(res => res.json()),
+    queryFn: () => fetch('/api/godowns', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
+    enabled: canView,
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: items = [] } = useQuery<any[]>({
     queryKey: ["master-data", "items"],
-    queryFn: () => fetch('/api/items').then(res => res.json()),
+    queryFn: () => fetch('/api/items', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
+    enabled: canView,
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: units = [] } = useQuery<any[]>({
     queryKey: ["master-data", "units"],
-    queryFn: () => fetch('/api/units').then(res => res.json()),
+    queryFn: () => fetch('/api/units', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
+    enabled: canView,
     staleTime: 1000 * 60 * 10,
   });
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view or create stock adjustments.</p>
+        </div>
+      </div>
+    );
+  }
 
   const mutation = useMutation({
     mutationFn: async (data: any) => {
@@ -69,7 +88,7 @@ const AdjustmentForm: React.FC = () => {
 
   const fetchBatches = async (itemId: string, godownId: string) => {
     if (!itemId || !godownId) return;
-    const res = await fetch(`/api/inventory/batches?itemId=${itemId}&godownId=${godownId}`);
+    const res = await fetch(`/api/inventory/batches?itemId=${itemId}&godownId=${godownId}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
     const data = await res.json();
     setBatches(data);
   };

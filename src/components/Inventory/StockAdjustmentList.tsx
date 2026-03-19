@@ -26,6 +26,9 @@ interface StockAdjustment {
 export default function StockAdjustmentList() {
   const [search, setSearch] = useState("");
   const [printDoc, setPrintDoc] = useState<any>(null);
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('inventory.view');
 
   const { data: adjustments = [], isLoading: loading } = useQuery<StockAdjustment[]>({
     queryKey: ['adjustments'],
@@ -36,8 +39,21 @@ export default function StockAdjustmentList() {
       if (!res.ok) throw new Error('Failed to fetch adjustments');
       return res.json();
     },
+    enabled: canView,
     staleTime: 30000,
   });
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view stock adjustments.</p>
+        </div>
+      </div>
+    );
+  }
 
   const handlePrintDoc = async (adj: any) => {
     try {

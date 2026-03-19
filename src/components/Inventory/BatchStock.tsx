@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Calendar } from 'lucide-react';
+import { Search, Calendar, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useQuery } from '@tanstack/react-query';
 import { useSettings } from '../../contexts/SettingsContext';
@@ -11,6 +11,13 @@ const BatchStock: React.FC = () => {
   const { format } = useSettings();
   const [searchTerm, setSearchTerm] = useState('');
 
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (permission: string) => {
+    if (currentUser.role === 'super_admin') return true;
+    return currentUser.permissions?.includes(permission);
+  };
+  const canView = hasPermission('inventory.view');
+
   const { data: stock = [], isLoading } = useQuery<any[]>({
     queryKey: ['inventory', 'current-stock'],
     queryFn: async () => {
@@ -21,7 +28,22 @@ const BatchStock: React.FC = () => {
       return res.json();
     },
     staleTime: 60000, // 60 seconds
+    enabled: canView,
   });
+
+  if (!canView) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-800 mb-2">Access Denied</h2>
+        <p className="text-slate-600 max-w-md">
+          You do not have permission to view the batch stock. Please contact your system administrator if you believe this is an error.
+        </p>
+      </div>
+    );
+  }
 
   const filteredStock = stock.filter((s: any) => 
     s.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||

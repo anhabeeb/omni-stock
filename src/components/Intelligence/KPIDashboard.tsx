@@ -39,23 +39,29 @@ interface TurnoverData {
 
 export const KPIDashboard: React.FC = () => {
   const { format } = useSettings();
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('intelligence.view');
+
   const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useQuery<KPISummary>({
     queryKey: ['kpi', 'summary'],
     queryFn: async () => {
-      const res = await fetch('/api/kpi/summary');
+      const res = await fetch('/api/kpi/summary', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
       if (!res.ok) throw new Error('Failed to fetch KPI summary');
       return res.json();
     },
+    enabled: canView,
     staleTime: 60000, // 60 seconds
   });
 
   const { data: turnover, isLoading: turnoverLoading, refetch: refetchTurnover } = useQuery<TurnoverData>({
     queryKey: ['kpi', 'turnover'],
     queryFn: async () => {
-      const res = await fetch('/api/kpi/turnover');
+      const res = await fetch('/api/kpi/turnover', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
       if (!res.ok) throw new Error('Failed to fetch turnover data');
       return res.json();
     },
+    enabled: canView,
     staleTime: 120000, // 120 seconds
   });
 
@@ -63,6 +69,18 @@ export const KPIDashboard: React.FC = () => {
     refetchSummary();
     refetchTurnover();
   };
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <Activity className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view intelligence dashboards.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (summaryLoading || turnoverLoading) return <div className="p-8 text-center">Loading Intelligence Dashboard...</div>;
 

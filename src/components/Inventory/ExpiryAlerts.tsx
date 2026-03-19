@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Calendar } from 'lucide-react';
+import { AlertTriangle, Calendar, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useQuery } from '@tanstack/react-query';
 import { ExportButton } from '../Common/ExportButton';
@@ -8,6 +8,9 @@ import { PrintHeader } from '../Common/PrintHeader';
 
 const ExpiryAlerts: React.FC = () => {
   const [days, setDays] = useState(30);
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('inventory.view');
 
   const { data: alerts = [], isLoading } = useQuery<any[]>({
     queryKey: ['inventory', 'expiry-alerts', days],
@@ -18,8 +21,21 @@ const ExpiryAlerts: React.FC = () => {
       if (!res.ok) throw new Error('Failed to fetch expiry alerts');
       return res.json();
     },
+    enabled: canView,
     staleTime: 60000, // 60 seconds
   });
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view expiry alerts.</p>
+        </div>
+      </div>
+    );
+  }
 
   const exportColumns = [
     { header: 'Item Name', key: 'item_name' },

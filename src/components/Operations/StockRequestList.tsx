@@ -23,6 +23,10 @@ interface StockRequestListProps {
 }
 
 export const StockRequestList: React.FC<StockRequestListProps> = ({ onNewRequest, onViewRequest }) => {
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('operations.view');
+
   const [requests, setRequests] = useState<StockRequest[]>([]);
   const [outlets, setOutlets] = useState<Outlet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,14 +34,18 @@ export const StockRequestList: React.FC<StockRequestListProps> = ({ onNewRequest
   const [printDoc, setPrintDoc] = useState<any>(null);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (canView) {
+      fetchData();
+    } else {
+      setLoading(false);
+    }
+  }, [canView]);
 
   const fetchData = async () => {
     try {
       const [reqRes, outRes] = await Promise.all([
-        fetch('/api/requests'),
-        fetch('/api/outlets')
+        fetch('/api/requests', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
+        fetch('/api/outlets', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
       ]);
       if (reqRes.ok) setRequests(await reqRes.json());
       if (outRes.ok) setOutlets(await outRes.json());
@@ -47,6 +55,18 @@ export const StockRequestList: React.FC<StockRequestListProps> = ({ onNewRequest
       setLoading(false);
     }
   };
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view stock requests.</p>
+        </div>
+      </div>
+    );
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -84,7 +104,7 @@ export const StockRequestList: React.FC<StockRequestListProps> = ({ onNewRequest
   const handlePrintDoc = async (e: React.MouseEvent, req: any) => {
     e.stopPropagation();
     try {
-      const response = await fetch(`/api/requests/${req.id}`);
+      const response = await fetch(`/api/requests/${req.id}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
       if (!response.ok) throw new Error('Failed to fetch request details');
       const details = await response.json();
       setPrintDoc(details);

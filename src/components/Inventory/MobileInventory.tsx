@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Package, Warehouse, Filter, RefreshCw, 
-  ChevronRight, ScanLine, AlertTriangle, Clock
+  ChevronRight, ScanLine, AlertTriangle, Clock, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import BarcodeScanner from '../Common/BarcodeScanner';
@@ -14,7 +14,18 @@ export default function MobileInventory() {
   const [showScanner, setShowScanner] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
 
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (permission: string) => {
+    if (currentUser.role === 'super_admin') return true;
+    return currentUser.permissions?.includes(permission);
+  };
+  const canView = hasPermission('inventory.view');
+
   const fetchItems = async () => {
+    if (!canView) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const token = localStorage.getItem('token');
     const res = await fetch('/api/items', {
@@ -29,7 +40,21 @@ export default function MobileInventory() {
 
   useEffect(() => {
     fetchItems();
-  }, []);
+  }, [canView]);
+
+  if (!canView) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 bg-slate-900 rounded-3xl border border-slate-800 p-8 text-center m-4">
+        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+        </div>
+        <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
+        <p className="text-slate-400 max-w-md">
+          You do not have permission to view inventory.
+        </p>
+      </div>
+    );
+  }
 
   const handleScan = async (code: string) => {
     const token = localStorage.getItem('token');

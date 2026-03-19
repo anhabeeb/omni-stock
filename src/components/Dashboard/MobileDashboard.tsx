@@ -11,7 +11,18 @@ export default function MobileDashboard({ user, onTabChange }: { user: any, onTa
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (permission: string) => {
+    if (currentUser.role === 'super_admin') return true;
+    return currentUser.permissions?.includes(permission);
+  };
+  const canView = hasPermission('dashboard.view');
+
   const fetchSummary = async () => {
+    if (!canView) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const token = localStorage.getItem('token');
     const res = await fetch('/api/reporting/dashboard-summary', {
@@ -26,7 +37,21 @@ export default function MobileDashboard({ user, onTabChange }: { user: any, onTa
 
   useEffect(() => {
     fetchSummary();
-  }, []);
+  }, [canView]);
+
+  if (!canView) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 bg-slate-900 rounded-3xl border border-slate-800 p-8 text-center m-4">
+        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+        </div>
+        <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
+        <p className="text-slate-400 max-w-md">
+          You do not have permission to view the dashboard.
+        </p>
+      </div>
+    );
+  }
 
   const QuickStat = ({ icon: Icon, label, value, color }: any) => (
     <div className="bg-slate-900 border border-slate-800 p-3 rounded-2xl flex items-center gap-3">
@@ -70,24 +95,28 @@ export default function MobileDashboard({ user, onTabChange }: { user: any, onTa
           Quick Actions
         </h3>
         <div className="grid grid-cols-2 gap-3">
-          <button 
-            onClick={() => onTabChange('grn')}
-            className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-2xl border border-slate-800 hover:bg-slate-800 transition-all"
-          >
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-              <ArrowDownLeft size={18} />
-            </div>
-            <span className="text-xs font-bold">Receive</span>
-          </button>
-          <button 
-            onClick={() => onTabChange('issue')}
-            className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-2xl border border-slate-800 hover:bg-slate-800 transition-all"
-          >
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
-              <ArrowUpRight size={18} />
-            </div>
-            <span className="text-xs font-bold">Issue</span>
-          </button>
+          {hasPermission('inventory.grn') && (
+            <button 
+              onClick={() => onTabChange('grn')}
+              className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-2xl border border-slate-800 hover:bg-slate-800 transition-all"
+            >
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                <ArrowDownLeft size={18} />
+              </div>
+              <span className="text-xs font-bold">Receive</span>
+            </button>
+          )}
+          {hasPermission('inventory.issue') && (
+            <button 
+              onClick={() => onTabChange('issue')}
+              className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-2xl border border-slate-800 hover:bg-slate-800 transition-all"
+            >
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
+                <ArrowUpRight size={18} />
+              </div>
+              <span className="text-xs font-bold">Issue</span>
+            </button>
+          )}
         </div>
       </div>
 

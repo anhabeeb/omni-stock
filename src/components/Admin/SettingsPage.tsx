@@ -24,6 +24,21 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
 
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('settings.view');
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-slate-300 mb-2">Access Denied</h2>
+          <p className="text-slate-500">You do not have permission to view this page.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return <div className="p-6 text-slate-400">Loading settings...</div>;
   }

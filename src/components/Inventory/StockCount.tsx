@@ -16,6 +16,10 @@ import DocumentPrintModal from '../Common/DocumentPrintModal';
 
 export default function StockCount() {
   const queryClient = useQueryClient();
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('inventory.view');
+
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const [newSession, setNewSession] = useState({ godown_id: '', remarks: '' });
@@ -30,7 +34,8 @@ export default function StockCount() {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       return res.json();
-    }
+    },
+    enabled: canView
   });
 
   const { data: godowns = [] } = useQuery<any[]>({
@@ -41,6 +46,7 @@ export default function StockCount() {
       });
       return res.json();
     },
+    enabled: canView,
     staleTime: 1000 * 60 * 10,
   });
 
@@ -52,8 +58,20 @@ export default function StockCount() {
       });
       return res.json();
     },
-    enabled: !!activeSessionId,
+    enabled: !!activeSessionId && canView,
   });
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view stock counts.</p>
+        </div>
+      </div>
+    );
+  }
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {

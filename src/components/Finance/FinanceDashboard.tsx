@@ -18,6 +18,10 @@ import { PrintHeader } from '../Common/PrintHeader';
 
 export default function FinanceDashboard() {
   const { format } = useSettings();
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('finance.view');
+
   const [filters, setFilters] = useState({
     from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     to: new Date().toISOString().split('T')[0]
@@ -33,6 +37,7 @@ export default function FinanceDashboard() {
       if (!res.ok) throw new Error('Failed to fetch finance summary');
       return res.json();
     },
+    enabled: canView,
     staleTime: 60000,
   });
 
@@ -43,6 +48,7 @@ export default function FinanceDashboard() {
       if (!res.ok) throw new Error('Failed to fetch outlet margins');
       return res.json();
     },
+    enabled: canView,
     staleTime: 120000,
   });
 
@@ -53,6 +59,7 @@ export default function FinanceDashboard() {
       if (!res.ok) throw new Error('Failed to fetch sales trend');
       return res.json();
     },
+    enabled: canView,
     staleTime: 120000,
   });
 
@@ -61,6 +68,18 @@ export default function FinanceDashboard() {
     refetchMargins();
     refetchTrend();
   };
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view the finance dashboard.</p>
+        </div>
+      </div>
+    );
+  }
 
   const loading = summaryLoading || marginsLoading || trendLoading;
 

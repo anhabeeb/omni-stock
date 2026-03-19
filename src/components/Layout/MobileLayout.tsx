@@ -19,18 +19,20 @@ export default function MobileLayout({ children, activeTab, onTabChange, user, o
 
   const tabs = [
     { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
-    { id: 'inventory', label: 'Stock', icon: Package },
-    { id: 'operations', label: 'Ops', icon: ScanLine },
-    { id: 'alerts', label: 'Alerts', icon: AlertCircle },
+    { id: 'inventory', label: 'Stock', icon: Package, permission: 'inventory.view' },
+    { id: 'operations', label: 'Ops', icon: ScanLine, permission: 'operations.view' },
+    { id: 'alerts', label: 'Alerts', icon: AlertCircle, permission: 'alerts.view' },
   ];
 
+  const filteredTabs = tabs.filter(tab => !tab.permission || user?.role === 'super_admin' || user?.permissions?.includes(tab.permission));
+
   const menuItems = [
-    { id: 'grn', label: 'Receive Stock (GRN)', icon: ArrowDownLeft },
-    { id: 'issue', label: 'Issue to Outlet', icon: ArrowUpRight },
-    { id: 'transfer', label: 'Transfer Stock', icon: RefreshCw },
-    { id: 'stock-count', label: 'Stock Count', icon: Search },
-    { id: 'wastage', label: 'Wastage Entry', icon: Trash2 },
-    { id: 'finance', label: 'Finance & Profit', icon: BarChart3, roles: ['super_admin', 'warehouse_manager'] },
+    { id: 'grn', label: 'Receive Stock (GRN)', icon: ArrowDownLeft, permission: 'inventory.grn' },
+    { id: 'issue', label: 'Issue to Outlet', icon: ArrowUpRight, permission: 'inventory.issue' },
+    { id: 'transfer', label: 'Transfer Stock', icon: RefreshCw, permission: 'inventory.transfer' },
+    { id: 'stock-count', label: 'Stock Count', icon: Search, permission: 'inventory.count' },
+    { id: 'wastage', label: 'Wastage Entry', icon: Trash2, permission: 'inventory.wastage' },
+    { id: 'finance', label: 'Finance & Profit', icon: BarChart3, permission: 'finance.view' },
   ];
 
   return (
@@ -58,7 +60,7 @@ export default function MobileLayout({ children, activeTab, onTabChange, user, o
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-t border-slate-800 px-6 py-3 flex items-center justify-between">
-        {tabs.map(tab => (
+        {filteredTabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
@@ -106,7 +108,7 @@ export default function MobileLayout({ children, activeTab, onTabChange, user, o
 
               <div className="flex-1 space-y-2 overflow-y-auto custom-scrollbar">
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2 mb-2">Operations</p>
-                {menuItems.filter(item => !item.roles || item.roles.includes(user?.role)).map(item => (
+                {menuItems.filter(item => !item.permission || user?.role === 'super_admin' || user?.permissions?.includes(item.permission)).map(item => (
                   <button
                     key={item.id}
                     onClick={() => {

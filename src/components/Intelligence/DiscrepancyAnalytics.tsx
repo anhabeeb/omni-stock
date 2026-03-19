@@ -31,6 +31,10 @@ interface DiscrepancySummary {
 
 export const DiscrepancyAnalytics: React.FC = () => {
   const { format } = useSettings();
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('intelligence.view');
+
   const { data: summary, isLoading: summaryLoading } = useQuery<DiscrepancySummary>({
     queryKey: ['discrepancies', 'summary'],
     queryFn: async () => {
@@ -40,6 +44,7 @@ export const DiscrepancyAnalytics: React.FC = () => {
       if (!res.ok) throw new Error('Failed to fetch discrepancy summary');
       return res.json();
     },
+    enabled: canView,
     staleTime: 60000, // 60 seconds
   });
 
@@ -52,8 +57,21 @@ export const DiscrepancyAnalytics: React.FC = () => {
       if (!res.ok) throw new Error('Failed to fetch trends');
       return res.json();
     },
+    enabled: canView,
     staleTime: 120000, // 120 seconds
   });
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <Activity className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view discrepancy analytics.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (summaryLoading || trendsLoading) return <div className="p-8 text-center">Loading Discrepancy Analytics...</div>;
 

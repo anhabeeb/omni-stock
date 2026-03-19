@@ -38,7 +38,7 @@ export const NotificationCenter: React.FC = () => {
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch('/api/notifications');
+      const res = await fetch('/api/notifications', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
       if (res.ok) setNotifications(await res.json());
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -47,7 +47,10 @@ export const NotificationCenter: React.FC = () => {
 
   const markAsRead = async (id: string) => {
     try {
-      const res = await fetch(`/api/notifications/${id}/read`, { method: 'POST' });
+      const res = await fetch(`/api/notifications/${id}/read`, { 
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
       if (res.ok) {
         setNotifications(notifications.filter(n => n.id !== id));
       }
@@ -58,7 +61,10 @@ export const NotificationCenter: React.FC = () => {
 
   const markAllAsRead = async () => {
     try {
-      const res = await fetch('/api/notifications/read-all', { method: 'POST' });
+      const res = await fetch('/api/notifications/read-all', { 
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
       if (res.ok) {
         setNotifications([]);
       }

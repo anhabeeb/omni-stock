@@ -9,6 +9,9 @@ import DocumentPrintModal from '../Common/DocumentPrintModal';
 const StockIssueList: React.FC = () => {
   const [search, setSearch] = useState("");
   const [printDoc, setPrintDoc] = useState<any>(null);
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('inventory.view');
 
   const { data: issues = [], isLoading: loading } = useQuery<any[]>({
     queryKey: ['issues'],
@@ -19,8 +22,21 @@ const StockIssueList: React.FC = () => {
       if (!response.ok) throw new Error('Failed to fetch issues');
       return response.json();
     },
+    enabled: canView,
     staleTime: 30000,
   });
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <FileText className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view stock issues.</p>
+        </div>
+      </div>
+    );
+  }
 
   const filtered = issues.filter((issue: any) => 
     issue.issue_number.toLowerCase().includes(search.toLowerCase()) ||

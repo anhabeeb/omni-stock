@@ -10,6 +10,9 @@ import { PrintHeader } from '../Common/PrintHeader';
 
 export default function Alerts() {
   const [selectedGodown, setSelectedGodown] = useState('');
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('inventory.view');
 
   const { data: alerts, isLoading: alertsLoading, refetch: refetchAlerts } = useQuery<any>({
     queryKey: ['alerts-summary', selectedGodown],
@@ -21,6 +24,7 @@ export default function Alerts() {
       if (!res.ok) throw new Error('Failed to fetch alerts');
       return res.json();
     },
+    enabled: canView,
     staleTime: 60000, // 60 seconds as per worker cache
   });
 
@@ -33,8 +37,21 @@ export default function Alerts() {
       if (!res.ok) throw new Error('Failed to fetch godowns');
       return res.json();
     },
+    enabled: canView,
     staleTime: 1000 * 60 * 10, // 10 minutes
   });
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view inventory alerts.</p>
+        </div>
+      </div>
+    );
+  }
 
   const getExportData = () => {
     if (!alerts) return [];

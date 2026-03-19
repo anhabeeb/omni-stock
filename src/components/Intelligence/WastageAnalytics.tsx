@@ -30,6 +30,10 @@ interface WastageAnalyticsData {
 
 export const WastageAnalytics: React.FC = () => {
   const { format } = useSettings();
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
+  const canView = hasPermission('intelligence.view');
+
   const { data, isLoading } = useQuery<WastageAnalyticsData>({
     queryKey: ['wastage', 'analytics'],
     queryFn: async () => {
@@ -39,8 +43,21 @@ export const WastageAnalytics: React.FC = () => {
       if (!res.ok) throw new Error('Failed to fetch wastage analytics');
       return res.json();
     },
+    enabled: canView,
     staleTime: 60000, // 60 seconds
   });
+
+  if (!canView) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400">You do not have permission to view wastage analytics.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) return <div className="p-8 text-center">Loading Wastage Analytics...</div>;
 
