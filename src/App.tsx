@@ -463,7 +463,7 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
 
 const LoginPage = ({ onLogin }: { onLogin: (user: User, token: string) => void }) => {
   const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("admin123");
+  const [password, setPassword] = useState("omnistock123");
   const [loading, setLoading] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [setupMessage, setSetupMessage] = useState("");
@@ -492,7 +492,7 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User, token: string) => void }
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}`,  "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password })
       });
       const data = await res.json() as any;

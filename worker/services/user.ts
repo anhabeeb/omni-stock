@@ -84,7 +84,7 @@ export class UserService {
     `).bind(username).first() as User;
   }
 
-  async getUserForLogin(username: string): Promise<User | null> {
+  async getUserForLogin(usernameOrEmail: string): Promise<User | null> {
     // Fix legacy roles if any (mapping old numeric IDs to new string IDs)
     await this.fixLegacyRoles();
 
@@ -92,8 +92,8 @@ export class UserService {
       SELECT u.*, r.name as role_name 
       FROM users u 
       LEFT JOIN roles r ON u.role_id = r.id 
-      WHERE LOWER(u.username) = LOWER(?) AND u.is_active = 1
-    `).bind(username).first() as User;
+      WHERE (LOWER(u.username) = LOWER(?) OR LOWER(u.email) = LOWER(?)) AND u.is_active = 1
+    `).bind(usernameOrEmail, usernameOrEmail).first() as User;
   }
 
   async getUserById(id: string): Promise<User | null> {

@@ -138,6 +138,7 @@ const authMiddleware = async (c: Context<{ Bindings: Bindings; Variables: Variab
     }
     
     const permissions = await userService.getUserPermissions(user.id);
+    console.log(`User ${user.username} has permissions: ${permissions.length}`);
     
     // Attach to context
     c.set('user', user);
@@ -167,6 +168,7 @@ const requirePermission = (permission: string) => async (c: Context<{ Bindings: 
 // Auth
 app.post("/api/auth/login", rateLimiter, async (c) => {
   const { username, password } = await c.req.json();
+  console.log(`Login attempt for: ${username}`);
   const secret = c.env.JWT_SECRET || "omnistock-secret-key-2026";
   const userService = new UserService(c.env.DB);
   const setupService = new SetupService(c.env.DB);
@@ -174,6 +176,7 @@ app.post("/api/auth/login", rateLimiter, async (c) => {
   // Check if DB is initialized
   const bootstrapStatus = await setupService.getBootstrapStatus();
   if (!bootstrapStatus.is_initialized) {
+    console.log(`Login failed: System not initialized`);
     return c.json({ 
       message: "System not initialized. Please run setup wizard.",
       needsSetup: true 
@@ -182,14 +185,22 @@ app.post("/api/auth/login", rateLimiter, async (c) => {
   
   const user = await userService.getUserForLogin(username);
 
-  if (!user || !user.password_hash) {
+  if (!user) {
+    console.log(`Login failed: User not found or inactive: ${username}`);
+    return c.json({ message: "Invalid credentials" }, 401);
+  }
+
+  if (!user.password_hash) {
+    console.log(`Login failed: User has no password hash: ${username}`);
     return c.json({ message: "Invalid credentials" }, 401);
   }
 
   if (!(await verifyPassword(password, user.password_hash))) {
+    console.log(`Login failed: Password mismatch for: ${username}`);
     return c.json({ message: "Invalid credentials" }, 401);
   }
 
+  console.log(`Login successful for: ${username}`);
   await userService.updateLastLogin(user.id);
   
   const token = await sign({ 
