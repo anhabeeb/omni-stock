@@ -35,7 +35,7 @@ export class UserService {
     let query = `
       SELECT u.*, r.name as role_name 
       FROM users u 
-      JOIN roles r ON u.role_id = r.id 
+      LEFT JOIN roles r ON u.role_id = r.id 
       WHERE 1=1
     `;
     const params: any[] = [];
@@ -62,30 +62,52 @@ export class UserService {
     return results as User[];
   }
 
+  private async fixLegacyRoles(): Promise<void> {
+    try {
+      await this.db.batch([
+        this.db.prepare("UPDATE users SET role_id = 'role_super_admin' WHERE role_id = '1' OR role_id = 1"),
+        this.db.prepare("UPDATE users SET role_id = 'role_admin' WHERE role_id = '2' OR role_id = 2"),
+        this.db.prepare("UPDATE users SET role_id = 'role_warehouse_manager' WHERE role_id = '3' OR role_id = 3"),
+        this.db.prepare("UPDATE users SET role_id = 'role_warehouse_staff' WHERE role_id = '4' OR role_id = 4")
+      ]);
+    } catch (e) {
+      console.error("Failed to fix legacy roles:", e);
+    }
+  }
+
   async getUserByUsername(username: string): Promise<User | null> {
     return await this.db.prepare(`
       SELECT u.*, r.name as role_name 
       FROM users u 
-      JOIN roles r ON u.role_id = r.id 
+      LEFT JOIN roles r ON u.role_id = r.id 
       WHERE LOWER(u.username) = LOWER(?) AND u.is_active = 1
     `).bind(username).first() as User;
   }
 
   async getUserForLogin(username: string): Promise<User | null> {
+    // Fix legacy roles if any (mapping old numeric IDs to new string IDs)
+    await this.fixLegacyRoles();
+
     return await this.db.prepare(`
       SELECT u.*, r.name as role_name 
       FROM users u 
-      JOIN roles r ON u.role_id = r.id 
+      LEFT JOIN roles r ON u.role_id = r.id 
       WHERE LOWER(u.username) = LOWER(?) AND u.is_active = 1
     `).bind(username).first() as User;
   }
 
   async getUserById(id: string): Promise<User | null> {
+    // Check if user has a legacy numeric role and fix it if so
+    const userCheck = await this.db.prepare(`SELECT role_id FROM users WHERE id = ?`).bind(id).first() as any;
+    if (userCheck && (typeof userCheck.role_id === 'number' || !isNaN(Number(userCheck.role_id)))) {
+      await this.fixLegacyRoles();
+    }
+
     return await this.db.prepare(`
       SELECT u.*, r.name as role_name 
       FROM users u 
-      JOIN roles r ON u.role_id = r.id 
-      WHERE u.id = ?
+      LEFT JOIN roles r ON u.role_id = r.id 
+      WHERE u.id = ? AND u.is_active = 1
     `).bind(id).first() as User;
   }
 
@@ -95,8 +117,7 @@ export class UserService {
       SELECT p.key
       FROM permissions p
       JOIN role_permissions rp ON p.id = rp.permission_id
-      JOIN users u ON u.role_id = rp.role_id
-      WHERE u.id = ?
+      WHERE rp.role_id = (SELECT role_id FROM users WHERE id = ?)
     `;
     const { results: roleResults } = await this.db.prepare(rolePermissionsQuery).bind(userId).all();
     const rolePermissions = new Set(roleResults.map((r: any) => r.key));
