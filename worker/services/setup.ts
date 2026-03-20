@@ -601,6 +601,16 @@ export class SetupService {
             current_value INTEGER NOT NULL DEFAULT 0,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )`,
+        `CREATE TABLE IF NOT EXISTS system_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT,
+            payload TEXT,
+            created_by TEXT REFERENCES users(id),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_system_events_created ON system_events(created_at)`,
         `CREATE INDEX IF NOT EXISTS idx_stock_movements_item ON stock_movements(item_id)`,
         `CREATE INDEX IF NOT EXISTS idx_stock_movements_godown ON stock_movements(godown_id)`,
         `CREATE INDEX IF NOT EXISTS idx_stock_movements_batch ON stock_movements(batch_id)`,

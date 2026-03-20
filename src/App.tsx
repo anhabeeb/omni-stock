@@ -10,6 +10,8 @@ import {
 } from "react-router-dom";
 import { useQuery, useQueryClient, QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
+import { LocalSyncService } from "./services/localSync";
+import { EventListenerService } from "./services/eventListener";
 import UsersPage from "./components/Admin/UsersPage";
 import SettingsPage from "./components/Admin/SettingsPage";
 import { SetupWizard } from "./components/Setup/SetupWizard";
@@ -290,7 +292,8 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden relative">
+        <SyncStatus />
         <header className={cn(
           "h-16 border-b backdrop-blur-xl flex items-center justify-between px-8",
           theme === 'dark' ? "border-slate-800 bg-slate-900/50" : "border-slate-200 bg-white/50"
@@ -455,6 +458,37 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
     </div>
   );
 };
+
+function SyncStatus() {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  if (isOnline && !isSyncing) return null;
+
+  return (
+    <div className={cn(
+      "absolute top-20 right-8 z-[9999] px-3 py-1.5 rounded-full text-xs font-medium shadow-lg flex items-center gap-2 transition-all duration-300",
+      isOnline ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-rose-500/10 text-rose-500 border border-rose-500/20"
+    )}>
+      {!isOnline && <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />}
+      {isOnline && isSyncing && <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />}
+      <span>{!isOnline ? 'Offline Mode' : 'Syncing...'}</span>
+    </div>
+  );
+}
 
 // --- Pages ---
 
@@ -759,6 +793,7 @@ const StatCard = ({ icon: Icon, label, value, color }: { icon: any, label: strin
 // --- Main App ---
 
 function AppContent() {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isInitialized, setIsInitialized] = useState<boolean | null>(null);
@@ -784,6 +819,32 @@ function AppContent() {
       if (savedUser && token) {
         setUser(JSON.parse(savedUser));
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        
+        // Hydrate TanStack Query from IndexedDB
+        const types: ('item' | 'supplier' | 'godown' | 'outlet' | 'category' | 'unit')[] = [
+          'item', 'supplier', 'godown', 'outlet', 'category', 'unit'
+        ];
+        
+        for (const type of types) {
+          const localData = await LocalSyncService.getLocalData(type);
+          if (localData && localData.length > 0) {
+            // Map 'item' to 'items' etc to match endpoint names used in query keys
+            const endpoint = type === 'item' ? 'items' : 
+                             type === 'supplier' ? 'suppliers' :
+                             type === 'godown' ? 'godowns' :
+                             type === 'outlet' ? 'outlets' :
+                             type === 'category' ? 'categories' :
+                             type === 'unit' ? 'units' : type;
+            
+            queryClient.setQueryData(["master-data", endpoint], localData);
+          }
+        }
+
+        // Trigger background sync
+        LocalSyncService.syncAll().catch(console.error);
+        
+        // Start real-time event listener
+        EventListenerService.start(queryClient);
         
         // Only check onboarding if logged in
         try {

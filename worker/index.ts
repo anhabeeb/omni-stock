@@ -39,6 +39,7 @@ import { OnboardingService } from './services/onboarding';
 import { UserService } from './services/user';
 import { SettingsService } from './services/settings';
 import { SetupService } from './services/setup';
+import { EventService, EventType } from './services/event';
 import { IdService } from './services/id';
 import { ReferenceType } from '../src/types';
 import { CacheManager } from './cache';
@@ -212,6 +213,14 @@ app.post("/api/auth/login", rateLimiter, async (c) => {
       permissions
     } 
   });
+});
+
+// Events Poll
+app.get("/api/events/poll", authMiddleware, async (c) => {
+  const since = c.req.query('since') || new Date(Date.now() - 60000).toISOString();
+  const eventService = new EventService(c.env.DB);
+  const events = await eventService.getEventsSince(since);
+  return c.json(events);
 });
 
 // Settings Public
@@ -454,6 +463,10 @@ app.post("/api/items", authMiddleware, requirePermission('master.items.create'),
     data.reorder_level || 0, data.min_stock || 0, data.max_stock || 0, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1
   ).run();
   
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('item.created', 'item', id, data, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ id, message: "Item created successfully" });
 });
@@ -479,6 +492,11 @@ app.put("/api/items/:id", authMiddleware, requirePermission('master.items.update
 app.post("/api/items/:id/deactivate", authMiddleware, requirePermission('master.items.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE items SET is_active = 0 WHERE id = ?").bind(id).run();
+  
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('item.deactivated', 'item', id, null, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Item deactivated successfully" });
 });
@@ -486,6 +504,11 @@ app.post("/api/items/:id/deactivate", authMiddleware, requirePermission('master.
 app.post("/api/items/:id/reactivate", authMiddleware, requirePermission('master.items.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE items SET is_active = 1 WHERE id = ?").bind(id).run();
+  
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('item.reactivated', 'item', id, null, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Item reactivated successfully" });
 });
@@ -493,6 +516,11 @@ app.post("/api/items/:id/reactivate", authMiddleware, requirePermission('master.
 app.delete("/api/items/:id", authMiddleware, requirePermission('master.items.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("DELETE FROM items WHERE id = ?").bind(id).run();
+  
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('item.deleted', 'item', id, null, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Item deleted successfully" });
 });
@@ -531,6 +559,10 @@ app.post("/api/suppliers", authMiddleware, requirePermission('master.suppliers.c
     id, data.code || id, data.name, data.contact_person || null, data.phone || null, data.email || null, data.address || null, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1
   ).run();
   
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('supplier.created', 'supplier', id, data, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ id, message: "Supplier created successfully" });
 });
@@ -546,6 +578,10 @@ app.put("/api/suppliers/:id", authMiddleware, requirePermission('master.supplier
     data.code, data.name, data.contact_person || null, data.phone || null, data.email || null, data.address || null, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1, id
   ).run();
   
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('supplier.updated', 'supplier', id, data, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Supplier updated successfully" });
 });
@@ -553,6 +589,11 @@ app.put("/api/suppliers/:id", authMiddleware, requirePermission('master.supplier
 app.post("/api/suppliers/:id/deactivate", authMiddleware, requirePermission('master.suppliers.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE suppliers SET is_active = 0 WHERE id = ?").bind(id).run();
+  
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('supplier.deactivated', 'supplier', id, null, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Supplier deactivated successfully" });
 });
@@ -560,6 +601,11 @@ app.post("/api/suppliers/:id/deactivate", authMiddleware, requirePermission('mas
 app.post("/api/suppliers/:id/reactivate", authMiddleware, requirePermission('master.suppliers.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE suppliers SET is_active = 1 WHERE id = ?").bind(id).run();
+  
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('supplier.reactivated', 'supplier', id, null, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Supplier reactivated successfully" });
 });
@@ -567,6 +613,11 @@ app.post("/api/suppliers/:id/reactivate", authMiddleware, requirePermission('mas
 app.delete("/api/suppliers/:id", authMiddleware, requirePermission('master.suppliers.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("DELETE FROM suppliers WHERE id = ?").bind(id).run();
+  
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('supplier.deleted', 'supplier', id, null, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Supplier deleted successfully" });
 });
@@ -605,6 +656,10 @@ app.post("/api/godowns", authMiddleware, requirePermission('master.godowns.creat
     id, data.code || id, data.name, data.address || null, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1
   ).run();
   
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('godown.created', 'godown', id, data, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ id, message: "Godown created successfully" });
 });
@@ -620,6 +675,10 @@ app.put("/api/godowns/:id", authMiddleware, requirePermission('master.godowns.up
     data.code, data.name, data.address || null, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1, id
   ).run();
   
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('godown.updated', 'godown', id, data, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Godown updated successfully" });
 });
@@ -627,6 +686,11 @@ app.put("/api/godowns/:id", authMiddleware, requirePermission('master.godowns.up
 app.post("/api/godowns/:id/deactivate", authMiddleware, requirePermission('master.godowns.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE godowns SET is_active = 0 WHERE id = ?").bind(id).run();
+  
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('godown.deactivated', 'godown', id, null, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Godown deactivated successfully" });
 });
@@ -634,6 +698,11 @@ app.post("/api/godowns/:id/deactivate", authMiddleware, requirePermission('maste
 app.post("/api/godowns/:id/reactivate", authMiddleware, requirePermission('master.godowns.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE godowns SET is_active = 1 WHERE id = ?").bind(id).run();
+  
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('godown.reactivated', 'godown', id, null, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Godown reactivated successfully" });
 });
@@ -641,6 +710,11 @@ app.post("/api/godowns/:id/reactivate", authMiddleware, requirePermission('maste
 app.delete("/api/godowns/:id", authMiddleware, requirePermission('master.godowns.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("DELETE FROM godowns WHERE id = ?").bind(id).run();
+  
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('godown.deleted', 'godown', id, null, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Godown deleted successfully" });
 });
@@ -679,6 +753,10 @@ app.post("/api/outlets", authMiddleware, requirePermission('master.outlets.creat
     id, data.code || id, data.name, data.address || null, data.manager_id || null, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1
   ).run();
   
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('outlet.created', 'outlet', id, data, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ id, message: "Outlet created successfully" });
 });
@@ -694,6 +772,10 @@ app.put("/api/outlets/:id", authMiddleware, requirePermission('master.outlets.up
     data.code, data.name, data.address || null, data.manager_id || null, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1, id
   ).run();
   
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('outlet.updated', 'outlet', id, data, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Outlet updated successfully" });
 });
@@ -701,6 +783,11 @@ app.put("/api/outlets/:id", authMiddleware, requirePermission('master.outlets.up
 app.post("/api/outlets/:id/deactivate", authMiddleware, requirePermission('master.outlets.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE outlets SET is_active = 0 WHERE id = ?").bind(id).run();
+  
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('outlet.deactivated', 'outlet', id, null, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Outlet deactivated successfully" });
 });
@@ -708,6 +795,11 @@ app.post("/api/outlets/:id/deactivate", authMiddleware, requirePermission('maste
 app.post("/api/outlets/:id/reactivate", authMiddleware, requirePermission('master.outlets.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE outlets SET is_active = 1 WHERE id = ?").bind(id).run();
+  
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('outlet.reactivated', 'outlet', id, null, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Outlet reactivated successfully" });
 });
@@ -715,6 +807,11 @@ app.post("/api/outlets/:id/reactivate", authMiddleware, requirePermission('maste
 app.delete("/api/outlets/:id", authMiddleware, requirePermission('master.outlets.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("DELETE FROM outlets WHERE id = ?").bind(id).run();
+  
+  const user = c.get('user');
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('outlet.deleted', 'outlet', id, null, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Outlet deleted successfully" });
 });
@@ -772,6 +869,10 @@ app.post("/api/grn", authMiddleware, requirePermission('inventory.grn.create'), 
     }
 
     await c.env.DB.batch(statements);
+    
+    const eventService = new EventService(c.env.DB);
+    await eventService.broadcast('inventory.changed', 'grn', id, null, user.id);
+    
     await CacheManager.invalidate(c);
     return c.json({ id, message: "GRN created successfully" }, 201);
   } catch (error) {
@@ -795,6 +896,11 @@ app.post("/api/grn/:id/post", authMiddleware, requirePermission('inventory.grn.p
   const inventoryService = new InventoryService(c.env.DB);
   try {
     await inventoryService.postGRN(id, user.id);
+    
+    const eventService = new EventService(c.env.DB);
+    await eventService.broadcast('grn.posted', 'grn', id, null, user.id);
+    await eventService.broadcast('inventory.changed', 'inventory', null, null, user.id);
+    
     await CacheManager.invalidate(c);
     return c.json({ message: "GRN posted successfully" });
   } catch (e: any) {
@@ -863,6 +969,10 @@ app.post("/api/issues", authMiddleware, requirePermission('inventory.issue.creat
 
   try {
     await c.env.DB.batch(statements);
+    
+    const eventService = new EventService(c.env.DB);
+    await eventService.broadcast('inventory.changed', 'issue', id, null, user.id);
+    
     await CacheManager.invalidate(c);
     return c.json({ id, message: "Stock Issue created successfully" });
   } catch (e: any) {
@@ -890,6 +1000,11 @@ app.post("/api/issues/:id/post", authMiddleware, requirePermission('inventory.is
   const inventoryService = new InventoryService(c.env.DB);
   try {
     await inventoryService.postIssue(id, user.id);
+    
+    const eventService = new EventService(c.env.DB);
+    await eventService.broadcast('issue.posted', 'issue', id, null, user.id);
+    await eventService.broadcast('inventory.changed', 'inventory', null, null, user.id);
+    
     await CacheManager.invalidate(c);
     return c.json({ message: "Stock Issue posted successfully" });
   } catch (e: any) {
@@ -966,6 +1081,10 @@ app.post("/api/transfers", authMiddleware, requirePermission('inventory.transfer
 
   try {
     await c.env.DB.batch(statements);
+    
+    const eventService = new EventService(c.env.DB);
+    await eventService.broadcast('inventory.changed', 'transfer', id, null, user.id);
+    
     await CacheManager.invalidate(c);
     return c.json({ id, message: "Transfer created successfully" });
   } catch (e: any) {
@@ -979,6 +1098,11 @@ app.post("/api/transfers/:id/dispatch", authMiddleware, requirePermission('inven
   const inventoryService = new InventoryService(c.env.DB);
   try {
     await inventoryService.dispatchTransfer(id, user.id);
+    
+    const eventService = new EventService(c.env.DB);
+    await eventService.broadcast('transfer.dispatched', 'transfer', id, null, user.id);
+    await eventService.broadcast('inventory.changed', 'inventory', null, null, user.id);
+    
     await CacheManager.invalidate(c);
     return c.json({ message: "Transfer dispatched successfully" });
   } catch (e: any) {
@@ -992,6 +1116,11 @@ app.post("/api/transfers/:id/receive", authMiddleware, requirePermission('invent
   const inventoryService = new InventoryService(c.env.DB);
   try {
     await inventoryService.receiveTransfer(id, user.id);
+    
+    const eventService = new EventService(c.env.DB);
+    await eventService.broadcast('transfer.received', 'transfer', id, null, user.id);
+    await eventService.broadcast('inventory.changed', 'inventory', null, null, user.id);
+    
     await CacheManager.invalidate(c);
     return c.json({ message: "Transfer received successfully" });
   } catch (e: any) {
@@ -1038,6 +1167,10 @@ app.post("/api/adjustments", authMiddleware, requirePermission('inventory.adjust
 
   try {
     await c.env.DB.batch(statements);
+    
+    const eventService = new EventService(c.env.DB);
+    await eventService.broadcast('inventory.changed', 'adjustment', id, null, user.id);
+    
     await CacheManager.invalidate(c);
     return c.json({ id, message: "Adjustment created successfully" });
   } catch (e: any) {
@@ -1051,6 +1184,11 @@ app.post("/api/adjustments/:id/post", authMiddleware, requirePermission('invento
   const inventoryService = new InventoryService(c.env.DB);
   try {
     await inventoryService.postAdjustment(id, user.id);
+    
+    const eventService = new EventService(c.env.DB);
+    await eventService.broadcast('adjustment.posted', 'adjustment', id, null, user.id);
+    await eventService.broadcast('inventory.changed', 'inventory', null, null, user.id);
+    
     await CacheManager.invalidate(c);
     return c.json({ message: "Adjustment posted successfully" });
   } catch (e: any) {
@@ -1193,6 +1331,10 @@ app.post("/api/stock-counts", authMiddleware, requirePermission('stockcount.crea
   const user = c.get('user') as any;
   const service = new StockCountService(c.env.DB);
   const result = await service.createSession(godown_id, user.id, remarks);
+  
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('inventory.changed', 'stock_count', result.id, null, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json(result);
 });
@@ -1217,6 +1359,11 @@ app.post("/api/stock-counts/:id/load-system-stock", authMiddleware, requirePermi
   const id = c.req.param('id');
   const service = new StockCountService(c.env.DB);
   await service.loadSystemStock(id);
+  
+  const user = c.get('user') as any;
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('inventory.changed', 'stock_count', id, null, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "System stock loaded" });
 });
@@ -1226,6 +1373,11 @@ app.put("/api/stock-counts/items/:itemId", authMiddleware, requirePermission('st
   const { counted_quantity, entered_unit_id, remarks } = await c.req.json();
   const service = new StockCountService(c.env.DB);
   await service.updateItemCount(itemId, counted_quantity, entered_unit_id, remarks);
+  
+  const user = c.get('user') as any;
+  const eventService = new EventService(c.env.DB);
+  await eventService.broadcast('inventory.changed', 'stock_count_item', itemId, null, user.id);
+  
   await CacheManager.invalidate(c);
   return c.json({ message: "Item count updated" });
 });
@@ -1254,6 +1406,11 @@ app.post("/api/stock-counts/:id/post", authMiddleware, requirePermission('stockc
   const service = new StockCountService(c.env.DB);
   try {
     await service.postSession(id, user.id);
+    
+    const eventService = new EventService(c.env.DB);
+    await eventService.broadcast('stockcount.posted', 'stock_count', id, null, user.id);
+    await eventService.broadcast('inventory.changed', 'inventory', null, null, user.id);
+    
     await CacheManager.invalidate(c);
     return c.json({ message: "Session posted and stock reconciled" });
   } catch (e: any) {

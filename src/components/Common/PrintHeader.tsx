@@ -2,7 +2,7 @@ import React from 'react';
 
 interface PrintHeaderProps {
   title: string;
-  filters?: Record<string, string | undefined>;
+  filters?: string | Record<string, string | undefined>;
 }
 
 export const PrintHeader: React.FC<PrintHeaderProps> = ({ title, filters }) => {
@@ -22,16 +22,20 @@ export const PrintHeader: React.FC<PrintHeaderProps> = ({ title, filters }) => {
         </div>
       </div>
       
-      {filters && Object.keys(filters).length > 0 && (
+      {filters && (
         <div className="mt-4 pt-4 border-t border-slate-200">
           <p className="text-sm font-semibold mb-2">Applied Filters:</p>
           <div className="flex flex-wrap gap-4 text-sm">
-            {Object.entries(filters).map(([key, value]) => value ? (
-              <div key={key} className="flex gap-1">
-                <span className="text-slate-500 capitalize">{key.replace(/_/g, ' ')}:</span>
-                <span className="font-medium">{value}</span>
-              </div>
-            ) : null)}
+            {typeof filters === 'string' ? (
+              <span>{filters}</span>
+            ) : (
+              Object.entries(filters).map(([key, value]) => value ? (
+                <div key={key} className="flex gap-1">
+                  <span className="text-slate-500 capitalize">{key.replace(/_/g, ' ')}:</span>
+                  <span className="font-medium">{value}</span>
+                </div>
+              ) : null)
+            )}
           </div>
         </div>
       )}
