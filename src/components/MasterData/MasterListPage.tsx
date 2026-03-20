@@ -57,8 +57,8 @@ export const MasterListPage = ({ title, endpoint, columns, user, permissions }: 
       return res.data;
     },
     enabled: !!user && canView,
-    staleTime: 1000 * 60 * 15,
-    gcTime: 1000 * 60 * 30,
+    staleTime: 0, // Always revalidate on mount/focus for master data
+    gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
   });
 
   if (!canView) {

@@ -50,7 +50,7 @@ export default function AnalyticsDashboard() {
         fetch(`/api/dashboard/stock-by-godown`, { headers }),
         fetch(`/api/dashboard/stock-by-category`, { headers }),
         fetch(`/api/dashboard/fast-moving`, { headers }),
-        fetch(`/api/godowns`, { headers })
+        fetch(`/api/godowns?activeOnly=true`, { headers })
       ]);
 
       setSummary(await sRes.json());

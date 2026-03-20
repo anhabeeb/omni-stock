@@ -414,7 +414,7 @@ app.put("/api/settings", authMiddleware, requirePermission('settings.update'), a
   const data = await c.req.json();
   const settingsService = new SettingsService(c.env.DB);
   await settingsService.updateSettings(data);
-  CacheManager.invalidate(c); // Invalidate cache on settings update
+  await CacheManager.invalidate(c); // Invalidate cache on settings update
   return c.json({ message: "Settings updated successfully" });
 });
 
@@ -422,7 +422,14 @@ app.put("/api/settings", authMiddleware, requirePermission('settings.update'), a
 app.get("/api/items", authMiddleware, requirePermission('master.items.view'), async (c) => {
   const cached = await CacheManager.get(c, 600);
   if (cached) return cached;
-  const { results } = await c.env.DB.prepare("SELECT * FROM items").all();
+  
+  const activeOnly = c.req.query("activeOnly") === "true";
+  let query = "SELECT * FROM items";
+  if (activeOnly) {
+    query += " WHERE is_active = 1";
+  }
+  
+  const { results } = await c.env.DB.prepare(query).all();
   return CacheManager.put(c, c.json(results), 600);
 });
 
@@ -447,7 +454,7 @@ app.post("/api/items", authMiddleware, requirePermission('master.items.create'),
     data.reorder_level || 0, data.min_stock || 0, data.max_stock || 0, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1
   ).run();
   
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ id, message: "Item created successfully" });
 });
 
@@ -465,28 +472,28 @@ app.put("/api/items/:id", authMiddleware, requirePermission('master.items.update
     id
   ).run();
   
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Item updated successfully" });
 });
 
 app.post("/api/items/:id/deactivate", authMiddleware, requirePermission('master.items.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE items SET is_active = 0 WHERE id = ?").bind(id).run();
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Item deactivated successfully" });
 });
 
 app.post("/api/items/:id/reactivate", authMiddleware, requirePermission('master.items.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE items SET is_active = 1 WHERE id = ?").bind(id).run();
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Item reactivated successfully" });
 });
 
 app.delete("/api/items/:id", authMiddleware, requirePermission('master.items.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("DELETE FROM items WHERE id = ?").bind(id).run();
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Item deleted successfully" });
 });
 
@@ -494,7 +501,14 @@ app.delete("/api/items/:id", authMiddleware, requirePermission('master.items.dea
 app.get("/api/suppliers", authMiddleware, requirePermission('master.suppliers.view'), async (c) => {
   const cached = await CacheManager.get(c, 600);
   if (cached) return cached;
-  const { results } = await c.env.DB.prepare("SELECT * FROM suppliers").all();
+  
+  const activeOnly = c.req.query("activeOnly") === "true";
+  let query = "SELECT * FROM suppliers";
+  if (activeOnly) {
+    query += " WHERE is_active = 1";
+  }
+  
+  const { results } = await c.env.DB.prepare(query).all();
   return CacheManager.put(c, c.json(results), 600);
 });
 
@@ -517,7 +531,7 @@ app.post("/api/suppliers", authMiddleware, requirePermission('master.suppliers.c
     id, data.code || id, data.name, data.contact_person || null, data.phone || null, data.email || null, data.address || null, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1
   ).run();
   
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ id, message: "Supplier created successfully" });
 });
 
@@ -532,28 +546,28 @@ app.put("/api/suppliers/:id", authMiddleware, requirePermission('master.supplier
     data.code, data.name, data.contact_person || null, data.phone || null, data.email || null, data.address || null, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1, id
   ).run();
   
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Supplier updated successfully" });
 });
 
 app.post("/api/suppliers/:id/deactivate", authMiddleware, requirePermission('master.suppliers.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE suppliers SET is_active = 0 WHERE id = ?").bind(id).run();
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Supplier deactivated successfully" });
 });
 
 app.post("/api/suppliers/:id/reactivate", authMiddleware, requirePermission('master.suppliers.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE suppliers SET is_active = 1 WHERE id = ?").bind(id).run();
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Supplier reactivated successfully" });
 });
 
 app.delete("/api/suppliers/:id", authMiddleware, requirePermission('master.suppliers.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("DELETE FROM suppliers WHERE id = ?").bind(id).run();
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Supplier deleted successfully" });
 });
 
@@ -561,7 +575,14 @@ app.delete("/api/suppliers/:id", authMiddleware, requirePermission('master.suppl
 app.get("/api/godowns", authMiddleware, requirePermission('master.godowns.view'), async (c) => {
   const cached = await CacheManager.get(c, 600);
   if (cached) return cached;
-  const { results } = await c.env.DB.prepare("SELECT * FROM godowns").all();
+  
+  const activeOnly = c.req.query("activeOnly") === "true";
+  let query = "SELECT * FROM godowns";
+  if (activeOnly) {
+    query += " WHERE is_active = 1";
+  }
+  
+  const { results } = await c.env.DB.prepare(query).all();
   return CacheManager.put(c, c.json(results), 600);
 });
 
@@ -584,7 +605,7 @@ app.post("/api/godowns", authMiddleware, requirePermission('master.godowns.creat
     id, data.code || id, data.name, data.address || null, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1
   ).run();
   
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ id, message: "Godown created successfully" });
 });
 
@@ -599,28 +620,28 @@ app.put("/api/godowns/:id", authMiddleware, requirePermission('master.godowns.up
     data.code, data.name, data.address || null, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1, id
   ).run();
   
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Godown updated successfully" });
 });
 
 app.post("/api/godowns/:id/deactivate", authMiddleware, requirePermission('master.godowns.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE godowns SET is_active = 0 WHERE id = ?").bind(id).run();
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Godown deactivated successfully" });
 });
 
 app.post("/api/godowns/:id/reactivate", authMiddleware, requirePermission('master.godowns.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE godowns SET is_active = 1 WHERE id = ?").bind(id).run();
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Godown reactivated successfully" });
 });
 
 app.delete("/api/godowns/:id", authMiddleware, requirePermission('master.godowns.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("DELETE FROM godowns WHERE id = ?").bind(id).run();
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Godown deleted successfully" });
 });
 
@@ -628,7 +649,14 @@ app.delete("/api/godowns/:id", authMiddleware, requirePermission('master.godowns
 app.get("/api/outlets", authMiddleware, requirePermission('master.outlets.view'), async (c) => {
   const cached = await CacheManager.get(c, 600);
   if (cached) return cached;
-  const { results } = await c.env.DB.prepare("SELECT * FROM outlets").all();
+  
+  const activeOnly = c.req.query("activeOnly") === "true";
+  let query = "SELECT * FROM outlets";
+  if (activeOnly) {
+    query += " WHERE is_active = 1";
+  }
+  
+  const { results } = await c.env.DB.prepare(query).all();
   return CacheManager.put(c, c.json(results), 600);
 });
 
@@ -651,7 +679,7 @@ app.post("/api/outlets", authMiddleware, requirePermission('master.outlets.creat
     id, data.code || id, data.name, data.address || null, data.manager_id || null, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1
   ).run();
   
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ id, message: "Outlet created successfully" });
 });
 
@@ -666,28 +694,28 @@ app.put("/api/outlets/:id", authMiddleware, requirePermission('master.outlets.up
     data.code, data.name, data.address || null, data.manager_id || null, data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1, id
   ).run();
   
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Outlet updated successfully" });
 });
 
 app.post("/api/outlets/:id/deactivate", authMiddleware, requirePermission('master.outlets.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE outlets SET is_active = 0 WHERE id = ?").bind(id).run();
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Outlet deactivated successfully" });
 });
 
 app.post("/api/outlets/:id/reactivate", authMiddleware, requirePermission('master.outlets.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("UPDATE outlets SET is_active = 1 WHERE id = ?").bind(id).run();
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Outlet reactivated successfully" });
 });
 
 app.delete("/api/outlets/:id", authMiddleware, requirePermission('master.outlets.deactivate'), async (c) => {
   const id = c.req.param("id");
   await c.env.DB.prepare("DELETE FROM outlets WHERE id = ?").bind(id).run();
-  CacheManager.invalidate(c);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Outlet deleted successfully" });
 });
 

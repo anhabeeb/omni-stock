@@ -29,9 +29,9 @@ export default function Alerts() {
   });
 
   const { data: godowns = [] } = useQuery<any[]>({
-    queryKey: ['master-data', 'godowns'],
+    queryKey: ['master-data', 'godowns', 'active'],
     queryFn: async () => {
-      const res = await fetch('/api/godowns', {
+      const res = await fetch('/api/godowns?activeOnly=true', {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (!res.ok) throw new Error('Failed to fetch godowns');

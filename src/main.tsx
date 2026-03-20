@@ -7,10 +7,10 @@ import './index.css';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes default
-      gcTime: 1000 * 60 * 30, // 30 minutes default
+      staleTime: 1000 * 30, // 30 seconds default
+      gcTime: 1000 * 60 * 10, // 10 minutes default
       retry: 1,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true, // Revalidate when user returns to tab
     },
   },
 });

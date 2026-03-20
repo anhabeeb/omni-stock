@@ -26,15 +26,15 @@ const AdjustmentForm: React.FC = () => {
   });
 
   const { data: godowns = [] } = useQuery<any[]>({
-    queryKey: ["master-data", "godowns"],
-    queryFn: () => fetch('/api/godowns', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
+    queryKey: ["master-data", "godowns", "active"],
+    queryFn: () => fetch('/api/godowns?activeOnly=true', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
     enabled: canView,
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: items = [] } = useQuery<any[]>({
-    queryKey: ["master-data", "items"],
-    queryFn: () => fetch('/api/items', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
+    queryKey: ["master-data", "items", "active"],
+    queryFn: () => fetch('/api/items?activeOnly=true', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
     enabled: canView,
     staleTime: 1000 * 60 * 10,
   });

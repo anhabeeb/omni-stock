@@ -37,7 +37,7 @@ export default function Reports() {
     const token = localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
     const [gRes, cRes] = await Promise.all([
-      fetch('/api/godowns', { headers }),
+      fetch('/api/godowns?activeOnly=true', { headers }),
       fetch('/api/categories', { headers })
     ]);
     setGodowns(await gRes.json());

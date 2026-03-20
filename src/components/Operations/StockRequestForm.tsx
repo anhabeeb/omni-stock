@@ -64,8 +64,8 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({ requestId, o
   const fetchData = async () => {
     try {
       const [itemsRes, outletsRes] = await Promise.all([
-        fetch('/api/items', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
-        fetch('/api/outlets', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+        fetch('/api/items?activeOnly=true', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
+        fetch('/api/outlets?activeOnly=true', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
       ]);
       
       if (itemsRes.ok) setItems(await itemsRes.json());

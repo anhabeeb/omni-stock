@@ -29,7 +29,7 @@ export default function MobileInventory() {
     }
     setLoading(true);
     const token = localStorage.getItem('token');
-    const res = await fetch('/api/items', {
+    const res = await fetch('/api/items?activeOnly=true', {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (res.ok) {

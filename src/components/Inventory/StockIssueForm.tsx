@@ -26,21 +26,21 @@ const StockIssueForm: React.FC = () => {
 
   const { data: outlets = [] } = useQuery<any[]>({
     queryKey: ["master-data", "outlets"],
-    queryFn: () => fetch('/api/outlets', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
+    queryFn: () => fetch('/api/outlets?activeOnly=true', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
     enabled: canView,
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: godowns = [] } = useQuery<any[]>({
     queryKey: ["master-data", "godowns"],
-    queryFn: () => fetch('/api/godowns', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
+    queryFn: () => fetch('/api/godowns?activeOnly=true', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
     enabled: canView,
     staleTime: 1000 * 60 * 10,
   });
 
   const { data: items = [] } = useQuery<any[]>({
     queryKey: ["master-data", "items"],
-    queryFn: () => fetch('/api/items', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
+    queryFn: () => fetch('/api/items?activeOnly=true', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }).then(res => res.json()),
     enabled: canView,
     staleTime: 1000 * 60 * 10,
   });

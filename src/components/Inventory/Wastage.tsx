@@ -76,7 +76,7 @@ export default function Wastage() {
   const { data: godowns = [] } = useQuery<any[]>({
     queryKey: ["master-data", "godowns"],
     queryFn: async () => {
-      const res = await fetch('/api/godowns', {
+      const res = await fetch('/api/godowns?activeOnly=true', {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       return res.json();
@@ -87,7 +87,7 @@ export default function Wastage() {
   const { data: items = [] } = useQuery<any[]>({
     queryKey: ["master-data", "items"],
     queryFn: async () => {
-      const res = await fetch('/api/items', {
+      const res = await fetch('/api/items?activeOnly=true', {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       return res.json();

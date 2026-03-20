@@ -42,7 +42,7 @@ export default function StockCount() {
   const { data: godowns = [] } = useQuery<any[]>({
     queryKey: ["master-data", "godowns"],
     queryFn: async () => {
-      const res = await fetch('/api/godowns', {
+      const res = await fetch('/api/godowns?activeOnly=true', {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       return res.json();
