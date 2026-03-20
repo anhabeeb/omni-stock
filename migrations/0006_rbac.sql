@@ -117,23 +117,42 @@ INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES
 
 -- 7. Migrate existing users to new roles if they exist
 -- This is tricky because existing role_id is INTEGER.
--- We'll just update the admin user to 'role_super_admin'
-UPDATE users SET role_id = 'role_super_admin' WHERE username = 'admin';
+-- We need to recreate the users table to change role_id to TEXT and point to roles_new.
 
--- 8. Finalize tables
--- Drop old roles table if it exists and rename new one
--- But wait, SQLite doesn't support RENAME if there are FKs.
--- Let's just use the new roles table and update the users table.
+CREATE TABLE IF NOT EXISTS users_new (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role_id TEXT,
+    full_name TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    phone TEXT,
+    last_login DATETIME,
+    FOREIGN KEY (role_id) REFERENCES roles_new(id)
+);
 
--- Actually, a better way is to:
--- 1. Rename old roles to roles_old
--- 2. Rename roles_new to roles
--- 3. Update users table role_id column type (not possible in SQLite, but we can just use TEXT values)
+INSERT INTO users_new (id, username, email, password_hash, role_id, full_name, is_active, created_at, updated_at, phone, last_login)
+SELECT id, username, email, password_hash, 
+    CASE 
+        WHEN role_id = 1 OR role_id = '1' OR role_id = 'super_admin' OR role_id = 'role_super_admin' THEN 'role_super_admin'
+        WHEN role_id = 2 OR role_id = '2' OR role_id = 'admin' OR role_id = 'role_admin' THEN 'role_admin'
+        WHEN role_id = 3 OR role_id = '3' OR role_id = 'warehouse_manager' OR role_id = 'role_warehouse_manager' THEN 'role_warehouse_manager'
+        WHEN role_id = 4 OR role_id = '4' OR role_id = 'warehouse_staff' OR role_id = 'role_warehouse_staff' THEN 'role_warehouse_staff'
+        ELSE 'role_admin'
+    END, 
+    full_name, is_active, created_at, updated_at, phone, last_login 
+FROM users;
 
-PRAGMA foreign_keys=OFF;
+UPDATE users_new SET role_id = 'role_super_admin' WHERE username = 'admin';
+
+DROP TABLE users;
+ALTER TABLE users_new RENAME TO users;
+
 DROP TABLE IF EXISTS roles;
 ALTER TABLE roles_new RENAME TO roles;
-PRAGMA foreign_keys=ON;
 
 -- 9. Indexes
 CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id);

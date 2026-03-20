@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { 
   Plus, 
   Trash2, 
@@ -122,7 +123,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({ requestId, o
         onSuccess();
       } else {
         const error = await res.json() as { message: string };
-        alert(`Error: ${error.message}`);
+        toast.error(`Error: ${error.message}`);
       }
     } catch (error) {
       console.error(`Error during ${action}:`, error);
@@ -133,7 +134,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({ requestId, o
 
   const handleSubmit = async (submit: boolean = false) => {
     if (!formData.outlet_id || formData.items.length === 0) {
-      alert("Please select an outlet and add at least one item.");
+      toast.error("Please select an outlet and add at least one item.");
       return;
     }
 
@@ -162,11 +163,11 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({ requestId, o
         onSuccess();
       } else {
         const error = await res.json() as { message: string };
-        alert(`Error: ${error.message}`);
+        toast.error(`Error: ${error.message}`);
       }
     } catch (error) {
       console.error('Error saving request:', error);
-      alert('Failed to save request.');
+      toast.error('Failed to save request.');
     } finally {
       setSubmitting(false);
     }

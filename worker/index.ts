@@ -419,14 +419,14 @@ app.put("/api/settings", authMiddleware, requirePermission('settings.update'), a
 });
 
 // Master Data
-app.get("/api/items", authMiddleware, async (c) => {
+app.get("/api/items", authMiddleware, requirePermission('master.items.view'), async (c) => {
   const cached = await CacheManager.get(c, 600);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare("SELECT * FROM items").all();
   return CacheManager.put(c, c.json(results), 600);
 });
 
-app.get("/api/items/:id", authMiddleware, async (c) => {
+app.get("/api/items/:id", authMiddleware, requirePermission('master.items.view'), async (c) => {
   const id = c.req.param("id");
   const item = await c.env.DB.prepare("SELECT * FROM items WHERE id = ?").bind(id).first();
   if (!item) return c.json({ error: "Not found" }, 404);
@@ -491,14 +491,14 @@ app.delete("/api/items/:id", authMiddleware, requirePermission('master.items.dea
 });
 
 // Suppliers
-app.get("/api/suppliers", authMiddleware, async (c) => {
+app.get("/api/suppliers", authMiddleware, requirePermission('master.suppliers.view'), async (c) => {
   const cached = await CacheManager.get(c, 600);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare("SELECT * FROM suppliers").all();
   return CacheManager.put(c, c.json(results), 600);
 });
 
-app.get("/api/suppliers/:id", authMiddleware, async (c) => {
+app.get("/api/suppliers/:id", authMiddleware, requirePermission('master.suppliers.view'), async (c) => {
   const id = c.req.param("id");
   const supplier = await c.env.DB.prepare("SELECT * FROM suppliers WHERE id = ?").bind(id).first();
   if (!supplier) return c.json({ error: "Not found" }, 404);
@@ -558,14 +558,14 @@ app.delete("/api/suppliers/:id", authMiddleware, requirePermission('master.suppl
 });
 
 // Godowns
-app.get("/api/godowns", authMiddleware, async (c) => {
+app.get("/api/godowns", authMiddleware, requirePermission('master.godowns.view'), async (c) => {
   const cached = await CacheManager.get(c, 600);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare("SELECT * FROM godowns").all();
   return CacheManager.put(c, c.json(results), 600);
 });
 
-app.get("/api/godowns/:id", authMiddleware, async (c) => {
+app.get("/api/godowns/:id", authMiddleware, requirePermission('master.godowns.view'), async (c) => {
   const id = c.req.param("id");
   const godown = await c.env.DB.prepare("SELECT * FROM godowns WHERE id = ?").bind(id).first();
   if (!godown) return c.json({ error: "Not found" }, 404);
@@ -625,14 +625,14 @@ app.delete("/api/godowns/:id", authMiddleware, requirePermission('master.godowns
 });
 
 // Outlets
-app.get("/api/outlets", authMiddleware, async (c) => {
+app.get("/api/outlets", authMiddleware, requirePermission('master.outlets.view'), async (c) => {
   const cached = await CacheManager.get(c, 600);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare("SELECT * FROM outlets").all();
   return CacheManager.put(c, c.json(results), 600);
 });
 
-app.get("/api/outlets/:id", authMiddleware, async (c) => {
+app.get("/api/outlets/:id", authMiddleware, requirePermission('master.outlets.view'), async (c) => {
   const id = c.req.param("id");
   const outlet = await c.env.DB.prepare("SELECT * FROM outlets WHERE id = ?").bind(id).first();
   if (!outlet) return c.json({ error: "Not found" }, 404);

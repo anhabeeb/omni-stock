@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { 
   Trash2, Plus, Search, Filter, 
   ChevronRight, CheckCircle2, XCircle, 
@@ -68,7 +69,7 @@ export default function Wastage() {
       setPrintDoc(data);
     } catch (error) {
       console.error('Error fetching wastage details:', error);
-      alert('Failed to load wastage details for printing.');
+      toast.error('Failed to load wastage details for printing.');
     }
   };
 
@@ -154,7 +155,7 @@ export default function Wastage() {
       queryClient.invalidateQueries({ queryKey: ["stock"] });
     },
     onError: (error: any) => {
-      alert(error.message);
+      toast.error(error.message);
     }
   });
 

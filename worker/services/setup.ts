@@ -177,20 +177,6 @@ export class SetupService {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (role_id, permission_id)
         )`,
-        `CREATE TABLE IF NOT EXISTS user_permission_grants (
-            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            permission_id TEXT NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
-            created_by TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (user_id, permission_id)
-        )`,
-        `CREATE TABLE IF NOT EXISTS user_permission_denials (
-            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            permission_id TEXT NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
-            created_by TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (user_id, permission_id)
-        )`,
         `CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
@@ -356,118 +342,111 @@ export class SetupService {
         ('role_warehouse_staff', 'warehouse_staff', 'Daily warehouse operations')`).run();
 
       await this.db.prepare(`INSERT OR IGNORE INTO permissions (id, key, description) VALUES
-        ('p_dash_v', 'dashboard.view', 'View dashboard'),
-        ('p_ana_v', 'analytics.view', 'View analytics'),
-        ('p_fin_v', 'finance.view', 'View finance'),
-        ('p_alt_v', 'alerts.view', 'View alerts'),
-        ('p_not_v', 'notifications.view', 'View notifications'),
-        ('p_rep_v', 'reports.view', 'View reports'),
-        ('p_rep_e', 'reports.export', 'Export reports'),
-        ('p_int_v', 'intelligence.view', 'View warehouse intelligence'),
-        ('p_kpi_v', 'kpi.view', 'View KPIs'),
-        ('p_req_v', 'stock_requests.view', 'View stock requests'),
-        ('p_req_c', 'stock_requests.create', 'Create stock requests'),
-        ('p_req_a', 'stock_requests.approve', 'Approve stock requests'),
-        ('p_req_f', 'stock_requests.fulfill', 'Fulfill stock requests'),
-        ('p_inv_v', 'inventory.view', 'View inventory'),
-        ('p_inv_g', 'inventory.grn', 'Manage GRN'),
-        ('p_inv_g_c', 'inventory.grn.create', 'Create GRN'),
-        ('p_inv_g_p', 'inventory.grn.post', 'Post GRN'),
-        ('p_inv_i', 'inventory.issue', 'Manage stock issue'),
-        ('p_inv_i_c', 'inventory.issue.create', 'Create stock issue'),
-        ('p_inv_i_p', 'inventory.issue.post', 'Post stock issue'),
-        ('p_inv_t', 'inventory.transfer', 'Manage transfers'),
-        ('p_inv_t_c', 'inventory.transfer.create', 'Create transfer'),
-        ('p_inv_t_a', 'inventory.transfer.approve', 'Approve transfer'),
-        ('p_inv_t_d', 'inventory.transfer.dispatch', 'Dispatch transfer'),
-        ('p_inv_t_r', 'inventory.transfer.receive', 'Receive transfer'),
-        ('p_inv_a', 'inventory.adjust', 'Manage stock adjustments'),
-        ('p_inv_a_c', 'inventory.adjustment.create', 'Create stock adjustment'),
-        ('p_inv_a_p', 'inventory.adjustment.post', 'Post stock adjustment'),
-        ('p_inv_c', 'inventory.count', 'Manage stock count'),
-        ('p_inv_c_v', 'stockcount.view', 'View stock counts'),
-        ('p_inv_c_c', 'stockcount.create', 'Create stock count'),
-        ('p_inv_c_s', 'stockcount.submit', 'Submit stock count'),
-        ('p_inv_c_a', 'stockcount.approve', 'Approve stock count'),
-        ('p_inv_c_p', 'stockcount.post', 'Post stock count'),
-        ('p_inv_w', 'inventory.wastage', 'Manage wastage'),
-        ('p_inv_w_v', 'wastage.view', 'View wastage'),
-        ('p_inv_w_c', 'wastage.create', 'Create wastage'),
-        ('p_inv_w_a', 'wastage.approve', 'Approve wastage'),
-        ('p_inv_w_p', 'wastage.post', 'Post wastage'),
-        ('p_m_i_v', 'master.items.view', 'View items'),
-        ('p_m_i_c', 'master.items.create', 'Create items'),
-        ('p_m_i_u', 'master.items.update', 'Update items'),
-        ('p_m_i_d', 'master.items.deactivate', 'Deactivate items'),
-        ('p_m_s_v', 'master.suppliers.view', 'View suppliers'),
-        ('p_m_s_c', 'master.suppliers.create', 'Create suppliers'),
-        ('p_m_s_u', 'master.suppliers.update', 'Update suppliers'),
-        ('p_m_s_d', 'master.suppliers.deactivate', 'Deactivate suppliers'),
-        ('p_m_g_v', 'master.godowns.view', 'View godowns'),
-        ('p_m_g_c', 'master.godowns.create', 'Create godowns'),
-        ('p_m_g_u', 'master.godowns.update', 'Update godowns'),
-        ('p_m_g_d', 'master.godowns.deactivate', 'Deactivate godowns'),
-        ('p_m_o_v', 'master.outlets.view', 'View outlets'),
-        ('p_m_o_c', 'master.outlets.create', 'Create outlets'),
-        ('p_m_o_u', 'master.outlets.update', 'Update outlets'),
-        ('p_m_o_d', 'master.outlets.deactivate', 'Deactivate outlets'),
-        ('p_u_v', 'users.view', 'View users'),
-        ('p_u_c', 'users.create', 'Create users'),
-        ('p_u_u', 'users.update', 'Update users'),
-        ('p_u_d', 'users.deactivate', 'Deactivate users'),
-        ('p_u_p_m', 'users.permissions.manage', 'Manage user permissions'),
-        ('p_rol_v', 'roles.view', 'View roles'),
-        ('p_set_v', 'settings.view', 'View settings'),
-        ('p_set_u', 'settings.update', 'Update settings'),
-        ('p_att_u', 'attachments.upload', 'Upload attachments'),
-        ('p_att_v', 'attachments.view', 'View attachments'),
-        ('p_att_d', 'attachments.delete', 'Delete attachments'),
-        ('p_bar_v', 'barcodes.view', 'View barcodes'),
-        ('p_bar_m', 'barcodes.manage', 'Manage barcodes'),
-        ('p_onb_v', 'onboarding.view', 'View onboarding'),
-        ('p_onb_c', 'onboarding.complete', 'Complete onboarding'),
-        ('p_onb_r', 'onboarding.reset', 'Reset onboarding')`).run();
+        ('perm_001', 'inventory.view', 'View inventory'),
+        ('perm_002', 'inventory.grn.create', 'Create goods receipt'),
+        ('perm_003', 'inventory.grn.post', 'Post goods receipt'),
+        ('perm_004', 'inventory.issue.create', 'Create stock issue'),
+        ('perm_005', 'inventory.issue.post', 'Post stock issue'),
+        ('perm_006', 'inventory.transfer.create', 'Create transfer'),
+        ('perm_007', 'inventory.transfer.approve', 'Approve transfer'),
+        ('perm_008', 'inventory.transfer.dispatch', 'Dispatch transfer'),
+        ('perm_009', 'inventory.transfer.receive', 'Receive transfer'),
+        ('perm_010', 'inventory.adjustment.create', 'Create stock adjustment'),
+        ('perm_011', 'inventory.adjustment.post', 'Post stock adjustment'),
+        ('perm_012', 'stockcount.view', 'View stock counts'),
+        ('perm_013', 'stockcount.create', 'Create stock count'),
+        ('perm_014', 'stockcount.submit', 'Submit stock count'),
+        ('perm_015', 'stockcount.approve', 'Approve stock count'),
+        ('perm_016', 'stockcount.post', 'Post stock count'),
+        ('perm_017', 'wastage.view', 'View wastage'),
+        ('perm_018', 'wastage.create', 'Create wastage'),
+        ('perm_019', 'wastage.approve', 'Approve wastage'),
+        ('perm_020', 'wastage.post', 'Post wastage'),
+        ('perm_021', 'requests.view', 'View stock requests'),
+        ('perm_022', 'requests.create', 'Create stock requests'),
+        ('perm_023', 'requests.approve', 'Approve stock requests'),
+        ('perm_024', 'requests.fulfill', 'Fulfill stock requests'),
+        ('perm_025', 'reports.view', 'View reports'),
+        ('perm_026', 'reports.export', 'Export reports'),
+        ('perm_027', 'finance.view', 'View finance screens'),
+        ('perm_028', 'kpi.view', 'View KPI dashboards'),
+        ('perm_029', 'users.view', 'View users'),
+        ('perm_030', 'users.create', 'Create users'),
+        ('perm_031', 'users.update', 'Update users'),
+        ('perm_032', 'users.deactivate', 'Deactivate users'),
+        ('perm_033', 'roles.view', 'View roles'),
+        ('perm_034', 'settings.view', 'View settings'),
+        ('perm_035', 'settings.update', 'Update settings'),
+        ('perm_036', 'alerts.view', 'View alerts'),
+        ('perm_037', 'notifications.view', 'View notifications'),
+        ('perm_038', 'attachments.upload', 'Upload attachments'),
+        ('perm_039', 'attachments.view', 'View attachments'),
+        ('perm_040', 'attachments.delete', 'Delete attachments'),
+        ('perm_041', 'barcodes.view', 'View barcodes'),
+        ('perm_042', 'barcodes.manage', 'Manage barcodes'),
+        ('perm_043', 'onboarding.view', 'View onboarding status'),
+        ('perm_044', 'onboarding.complete', 'Complete onboarding'),
+        ('perm_045', 'onboarding.reset', 'Reset onboarding for users'),
+        ('perm_master_items_view', 'master.items.view', 'View items'),
+        ('perm_master_items_create', 'master.items.create', 'Create items'),
+        ('perm_master_items_update', 'master.items.update', 'Update items'),
+        ('perm_master_items_deactivate', 'master.items.deactivate', 'Deactivate items'),
+        ('perm_master_suppliers_view', 'master.suppliers.view', 'View suppliers'),
+        ('perm_master_suppliers_create', 'master.suppliers.create', 'Create suppliers'),
+        ('perm_master_suppliers_update', 'master.suppliers.update', 'Update suppliers'),
+        ('perm_master_suppliers_deactivate', 'master.suppliers.deactivate', 'Deactivate suppliers'),
+        ('perm_master_godowns_view', 'master.godowns.view', 'View godowns'),
+        ('perm_master_godowns_create', 'master.godowns.create', 'Create godowns'),
+        ('perm_master_godowns_update', 'master.godowns.update', 'Update godowns'),
+        ('perm_master_godowns_deactivate', 'master.godowns.deactivate', 'Deactivate godowns'),
+        ('perm_master_outlets_view', 'master.outlets.view', 'View outlets'),
+        ('perm_master_outlets_create', 'master.outlets.create', 'Create outlets'),
+        ('perm_master_outlets_update', 'master.outlets.update', 'Update outlets'),
+        ('perm_master_outlets_deactivate', 'master.outlets.deactivate', 'Deactivate outlets')`).run();
 
       // Seed Role Permissions
       // Super Admin = all permissions
       await this.db.prepare(`INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
         SELECT 'role_super_admin', id FROM permissions`).run();
 
-      // Admin = broad access but restricted platform management
-      await this.db.prepare(`INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
-        SELECT 'role_admin', id FROM permissions 
-        WHERE key NOT IN ('users.permissions.manage', 'settings.update', 'onboarding.reset')`).run();
+      // Admin
+      await this.db.prepare(`INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES
+        ('role_admin', 'perm_001'), ('role_admin', 'perm_002'), ('role_admin', 'perm_003'), ('role_admin', 'perm_004'), ('role_admin', 'perm_005'),
+        ('role_admin', 'perm_006'), ('role_admin', 'perm_007'), ('role_admin', 'perm_008'), ('role_admin', 'perm_009'), ('role_admin', 'perm_010'),
+        ('role_admin', 'perm_011'), ('role_admin', 'perm_012'), ('role_admin', 'perm_013'), ('role_admin', 'perm_014'), ('role_admin', 'perm_015'),
+        ('role_admin', 'perm_016'), ('role_admin', 'perm_017'), ('role_admin', 'perm_018'), ('role_admin', 'perm_019'), ('role_admin', 'perm_020'),
+        ('role_admin', 'perm_021'), ('role_admin', 'perm_022'), ('role_admin', 'perm_023'), ('role_admin', 'perm_024'), ('role_admin', 'perm_025'),
+        ('role_admin', 'perm_026'), ('role_admin', 'perm_027'), ('role_admin', 'perm_028'), ('role_admin', 'perm_029'), ('role_admin', 'perm_030'),
+        ('role_admin', 'perm_031'), ('role_admin', 'perm_032'), ('role_admin', 'perm_033'), ('role_admin', 'perm_034'), ('role_admin', 'perm_035'),
+        ('role_admin', 'perm_036'), ('role_admin', 'perm_037'), ('role_admin', 'perm_038'), ('role_admin', 'perm_039'), ('role_admin', 'perm_040'),
+        ('role_admin', 'perm_041'), ('role_admin', 'perm_042'), ('role_admin', 'perm_043'), ('role_admin', 'perm_044'), ('role_admin', 'perm_045'),
+        ('role_admin', 'perm_master_items_view'), ('role_admin', 'perm_master_items_create'), ('role_admin', 'perm_master_items_update'), ('role_admin', 'perm_master_items_deactivate'),
+        ('role_admin', 'perm_master_suppliers_view'), ('role_admin', 'perm_master_suppliers_create'), ('role_admin', 'perm_master_suppliers_update'), ('role_admin', 'perm_master_suppliers_deactivate'),
+        ('role_admin', 'perm_master_godowns_view'), ('role_admin', 'perm_master_godowns_create'), ('role_admin', 'perm_master_godowns_update'), ('role_admin', 'perm_master_godowns_deactivate'),
+        ('role_admin', 'perm_master_outlets_view'), ('role_admin', 'perm_master_outlets_create'), ('role_admin', 'perm_master_outlets_update'), ('role_admin', 'perm_master_outlets_deactivate')`).run();
 
       // Warehouse Manager
-      await this.db.prepare(`INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
-        SELECT 'role_warehouse_manager', id FROM permissions
-        WHERE key IN (
-          'dashboard.view', 'analytics.view', 'alerts.view', 'notifications.view', 'reports.view', 'kpi.view',
-          'stock_requests.view', 'stock_requests.create', 'stock_requests.approve', 'stock_requests.fulfill',
-          'inventory.view', 'inventory.grn', 'inventory.grn.create', 'inventory.grn.post',
-          'inventory.issue', 'inventory.issue.create', 'inventory.issue.post',
-          'inventory.transfer', 'inventory.transfer.create', 'inventory.transfer.approve', 'inventory.transfer.dispatch', 'inventory.transfer.receive',
-          'inventory.adjust', 'inventory.adjustment.create', 'inventory.adjustment.post',
-          'inventory.count', 'stockcount.view', 'stockcount.create', 'stockcount.submit', 'stockcount.approve', 'stockcount.post',
-          'inventory.wastage', 'wastage.view', 'wastage.create', 'wastage.approve', 'wastage.post',
-          'master.items.view', 'master.suppliers.view', 'master.godowns.view', 'master.outlets.view',
-          'attachments.upload', 'attachments.view', 'barcodes.view', 'onboarding.view', 'onboarding.complete'
-        )`).run();
+      await this.db.prepare(`INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES
+        ('role_warehouse_manager', 'perm_001'), ('role_warehouse_manager', 'perm_002'), ('role_warehouse_manager', 'perm_003'), ('role_warehouse_manager', 'perm_004'), ('role_warehouse_manager', 'perm_005'),
+        ('role_warehouse_manager', 'perm_006'), ('role_warehouse_manager', 'perm_007'), ('role_warehouse_manager', 'perm_008'), ('role_warehouse_manager', 'perm_009'), ('role_warehouse_manager', 'perm_010'),
+        ('role_warehouse_manager', 'perm_011'), ('role_warehouse_manager', 'perm_012'), ('role_warehouse_manager', 'perm_013'), ('role_warehouse_manager', 'perm_014'), ('role_warehouse_manager', 'perm_015'),
+        ('role_warehouse_manager', 'perm_016'), ('role_warehouse_manager', 'perm_017'), ('role_warehouse_manager', 'perm_018'), ('role_warehouse_manager', 'perm_019'), ('role_warehouse_manager', 'perm_020'),
+        ('role_warehouse_manager', 'perm_021'), ('role_warehouse_manager', 'perm_023'), ('role_warehouse_manager', 'perm_024'), ('role_warehouse_manager', 'perm_025'), ('role_warehouse_manager', 'perm_028'),
+        ('role_warehouse_manager', 'perm_036'), ('role_warehouse_manager', 'perm_037'), ('role_warehouse_manager', 'perm_038'), ('role_warehouse_manager', 'perm_039'), ('role_warehouse_manager', 'perm_041'),
+        ('role_warehouse_manager', 'perm_043'), ('role_warehouse_manager', 'perm_044'),
+        ('role_warehouse_manager', 'perm_master_items_view'), ('role_warehouse_manager', 'perm_master_items_create'), ('role_warehouse_manager', 'perm_master_items_update'),
+        ('role_warehouse_manager', 'perm_master_suppliers_view'), ('role_warehouse_manager', 'perm_master_suppliers_create'), ('role_warehouse_manager', 'perm_master_suppliers_update'),
+        ('role_warehouse_manager', 'perm_master_godowns_view'), ('role_warehouse_manager', 'perm_master_godowns_create'), ('role_warehouse_manager', 'perm_master_godowns_update'),
+        ('role_warehouse_manager', 'perm_master_outlets_view'), ('role_warehouse_manager', 'perm_master_outlets_create'), ('role_warehouse_manager', 'perm_master_outlets_update')`).run();
 
       // Warehouse Staff
-      await this.db.prepare(`INSERT OR IGNORE INTO role_permissions (role_id, permission_id)
-        SELECT 'role_warehouse_staff', id FROM permissions
-        WHERE key IN (
-          'dashboard.view', 'alerts.view', 'notifications.view',
-          'stock_requests.view', 'stock_requests.create',
-          'inventory.view', 'inventory.grn', 'inventory.grn.create',
-          'inventory.issue', 'inventory.issue.create',
-          'inventory.transfer', 'inventory.transfer.create', 'inventory.transfer.receive',
-          'inventory.adjust', 'inventory.adjustment.create',
-          'inventory.count', 'stockcount.view', 'stockcount.create', 'stockcount.submit',
-          'inventory.wastage', 'wastage.view', 'wastage.create',
-          'attachments.upload', 'attachments.view', 'barcodes.view', 'onboarding.view', 'onboarding.complete'
-        )`).run();
+      await this.db.prepare(`INSERT OR IGNORE INTO role_permissions (role_id, permission_id) VALUES
+        ('role_warehouse_staff', 'perm_001'), ('role_warehouse_staff', 'perm_002'), ('role_warehouse_staff', 'perm_004'), ('role_warehouse_staff', 'perm_006'), ('role_warehouse_staff', 'perm_012'),
+        ('role_warehouse_staff', 'perm_013'), ('role_warehouse_staff', 'perm_014'), ('role_warehouse_staff', 'perm_017'), ('role_warehouse_staff', 'perm_018'), ('role_warehouse_staff', 'perm_021'),
+        ('role_warehouse_staff', 'perm_022'), ('role_warehouse_staff', 'perm_036'), ('role_warehouse_staff', 'perm_037'), ('role_warehouse_staff', 'perm_038'), ('role_warehouse_staff', 'perm_039'),
+        ('role_warehouse_staff', 'perm_041'), ('role_warehouse_staff', 'perm_043'), ('role_warehouse_staff', 'perm_044'),
+        ('role_warehouse_staff', 'perm_master_items_view'), ('role_warehouse_staff', 'perm_master_suppliers_view'),
+        ('role_warehouse_staff', 'perm_master_godowns_view'), ('role_warehouse_staff', 'perm_master_outlets_view')`).run();
 
       await this.db.prepare("INSERT OR IGNORE INTO units (code, name) VALUES ('kg', 'Kilogram'), ('g', 'Gram'), ('ltr', 'Liter'), ('pcs', 'Pieces'), ('ml', 'Milliliter'), ('box', 'Box'), ('carton', 'Carton'), ('tray', 'Tray'), ('bag', 'Bag'), ('bottle', 'Bottle'), ('can', 'Can'), ('packet', 'Packet')").run();
       
@@ -476,90 +455,12 @@ export class SetupService {
         VALUES ('00000000-0000-0000-0000-000000000001', 'admin', 'admin@omnistock.com', 'e22d2a64f93df13c3560a0420e926529006adc85d12b24735fced9e5d13664b6', 'System Admin', 'role_super_admin', 1)`).run();
 
       // Seed Bootstrap
-      await this.db.prepare("INSERT OR REPLACE INTO system_bootstrap (id, is_initialized, initialized_at) VALUES ('main', 1, CURRENT_TIMESTAMP)").run();
+      await this.db.prepare("INSERT OR IGNORE INTO system_bootstrap (id, is_initialized) VALUES ('main', 0)").run();
 
       return { success: true, message: "Database initialized successfully" };
     } catch (e: any) {
       console.error("Initialization failed:", e);
       return { success: false, message: e.message };
-    }
-  }
-
-  async repairRBAC(): Promise<void> {
-    console.log("Running RBAC repair...");
-    try {
-      // 1. Ensure all new roles exist
-      await this.db.batch([
-        this.db.prepare("INSERT OR IGNORE INTO roles (id, name, description) VALUES ('role_super_admin', 'super_admin', 'Full system access')"),
-        this.db.prepare("INSERT OR IGNORE INTO roles (id, name, description) VALUES ('role_admin', 'admin', 'Administrative access with some restrictions')"),
-        this.db.prepare("INSERT OR IGNORE INTO roles (id, name, description) VALUES ('role_warehouse_manager', 'warehouse_manager', 'Warehouse management and approvals')"),
-        this.db.prepare("INSERT OR IGNORE INTO roles (id, name, description) VALUES ('role_warehouse_staff', 'warehouse_staff', 'Daily warehouse operations')")
-      ]);
-
-      // 2. Map legacy roles
-      await this.db.batch([
-        this.db.prepare("UPDATE users SET role_id = 'role_super_admin' WHERE role_id = '1' OR role_id = 1"),
-        this.db.prepare("UPDATE users SET role_id = 'role_admin' WHERE role_id = '2' OR role_id = 2"),
-        this.db.prepare("UPDATE users SET role_id = 'role_warehouse_manager' WHERE role_id = '3' OR role_id = 3"),
-        this.db.prepare("UPDATE users SET role_id = 'role_warehouse_staff' WHERE role_id = '4' OR role_id = 4")
-      ]);
-
-      // 3. Ensure superadmin user has correct role
-      await this.db.prepare("UPDATE users SET role_id = 'role_super_admin' WHERE username = 'superadmin' OR username = 'admin'").run();
-
-      // 4. Ensure permissions exist
-      const permissions = [
-        ['perm_users_view', 'users.view', 'View users list'],
-        ['perm_users_create', 'users.create', 'Create new users'],
-        ['perm_users_update', 'users.update', 'Update existing users'],
-        ['perm_users_deactivate', 'users.deactivate', 'Deactivate/Reactivate users'],
-        ['perm_users_permissions_manage', 'users.permissions.manage', 'Manage individual user permissions'],
-        ['perm_inventory_view', 'inventory.view', 'View inventory'],
-        ['perm_inventory_manage', 'inventory.manage', 'Manage inventory items'],
-        ['perm_stock_issue', 'stock.issue', 'Issue stock'],
-        ['perm_stock_receive', 'stock.receive', 'Receive stock (GRN)'],
-        ['perm_stock_transfer', 'stock.transfer', 'Transfer stock between godowns'],
-        ['perm_stock_count', 'stock.count', 'Perform stock counts'],
-        ['perm_stock_wastage', 'stock.wastage', 'Record stock wastage'],
-        ['perm_godowns_manage', 'godowns.manage', 'Manage godowns'],
-        ['perm_suppliers_manage', 'suppliers.manage', 'Manage suppliers'],
-        ['perm_categories_manage', 'categories.manage', 'Manage item categories'],
-        ['perm_reports_view', 'reports.view', 'View reports'],
-        ['perm_settings_update', 'settings.update', 'Update system settings'],
-        ['perm_onboarding_reset', 'onboarding.reset', 'Reset user tutorials']
-      ];
-
-      for (const [id, key, desc] of permissions) {
-        await this.db.prepare("INSERT OR IGNORE INTO permissions (id, key, description) VALUES (?, ?, ?)").bind(id, key, desc).run();
-      }
-
-      // 5. Re-seed role_permissions (non-destructively)
-      await this.db.batch([
-        // Super Admin
-        this.db.prepare("INSERT OR IGNORE INTO role_permissions (role_id, permission_id) SELECT 'role_super_admin', id FROM permissions"),
-        // Admin (restricted)
-        this.db.prepare(`
-          INSERT OR IGNORE INTO role_permissions (role_id, permission_id) 
-          SELECT 'role_admin', id FROM permissions 
-          WHERE key NOT IN ('users.permissions.manage', 'settings.update', 'onboarding.reset')
-        `),
-        // Manager
-        this.db.prepare(`
-          INSERT OR IGNORE INTO role_permissions (role_id, permission_id) 
-          SELECT 'role_warehouse_manager', id FROM permissions 
-          WHERE key IN ('inventory.view', 'inventory.manage', 'stock.issue', 'stock.receive', 'stock.transfer', 'stock.count', 'stock.wastage', 'reports.view', 'suppliers.manage', 'categories.manage')
-        `),
-        // Staff
-        this.db.prepare(`
-          INSERT OR IGNORE INTO role_permissions (role_id, permission_id) 
-          SELECT 'role_warehouse_staff', id FROM permissions 
-          WHERE key IN ('inventory.view', 'stock.issue', 'stock.receive', 'stock.transfer', 'stock.count', 'stock.wastage')
-        `)
-      ]);
-
-      console.log("RBAC repair completed successfully.");
-    } catch (e) {
-      console.error("RBAC repair failed:", e);
     }
   }
 }

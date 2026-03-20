@@ -15,6 +15,7 @@ import SettingsPage from "./components/Admin/SettingsPage";
 import { SetupWizard } from "./components/Setup/SetupWizard";
 import { Tutorial } from "./components/Onboarding/Tutorial";
 import axios from "axios";
+import toast, { Toaster } from "react-hot-toast";
 import { 
   LayoutDashboard, 
   Package, 
@@ -473,10 +474,10 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User, token: string) => void }
         setSetupMessage("Database initialized! You can now login.");
         setNeedsSetup(false);
       } else {
-        alert(data.message || "Setup failed");
+        toast.error(data.message || "Setup failed");
       }
     } catch (err) {
-      alert("Setup failed");
+      toast.error("Setup failed");
     } finally {
       setLoading(false);
     }
@@ -498,10 +499,10 @@ const LoginPage = ({ onLogin }: { onLogin: (user: User, token: string) => void }
         setNeedsSetup(true);
         setSetupMessage(data.message);
       } else {
-        alert(data.message);
+        toast.error(data.message);
       }
     } catch (err) {
-      alert("Login failed");
+      toast.error("Login failed");
     } finally {
       setLoading(false);
     }
@@ -912,6 +913,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <SettingsProvider>
+        <Toaster position="top-right" />
         <AppContent />
       </SettingsProvider>
     </QueryClientProvider>

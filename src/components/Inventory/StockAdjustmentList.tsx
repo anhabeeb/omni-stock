@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Plus, Search, Filter, MoreVertical, AlertCircle, CheckCircle2, Clock, Printer } from "lucide-react";
 import { motion } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
+import toast from 'react-hot-toast';
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { ExportButton } from '../Common/ExportButton';
@@ -65,7 +66,7 @@ export default function StockAdjustmentList() {
       setPrintDoc(data);
     } catch (error) {
       console.error('Error fetching adjustment details:', error);
-      alert('Failed to load adjustment details for printing.');
+      toast.error('Failed to load adjustment details for printing.');
     }
   };
 

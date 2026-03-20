@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { 
   Users, 
   Search, 
@@ -311,16 +312,16 @@ export default function UsersPage() {
                           {hasPermission('onboarding.reset') && (
                             <button 
                               onClick={async () => {
-                                if (confirm(`Are you sure you want to reset the tutorial for ${user.full_name}?`)) {
+                                if (window.confirm(`Are you sure you want to reset the tutorial for ${user.full_name}?`)) {
                                   try {
                                     const res = await fetch(`/api/onboarding/reset/${user.id}`, {
                                       method: 'POST',
                                       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
                                     });
-                                    if (res.ok) alert('Tutorial reset successfully');
-                                    else alert('Failed to reset tutorial');
+                                    if (res.ok) toast.success('Tutorial reset successfully');
+                                    else toast.error('Failed to reset tutorial');
                                   } catch (err) {
-                                    alert('Error resetting tutorial');
+                                    toast.error('Error resetting tutorial');
                                   }
                                 }
                               }}
@@ -511,9 +512,9 @@ export default function UsersPage() {
                   if (res.ok) {
                     setIsResetModalOpen(false);
                     setResettingUser(null);
-                    alert('Password reset successfully');
+                    toast.success('Password reset successfully');
                   } else {
-                    alert('Failed to reset password');
+                    toast.error('Failed to reset password');
                   }
                 }}
                 className="p-6 space-y-4"

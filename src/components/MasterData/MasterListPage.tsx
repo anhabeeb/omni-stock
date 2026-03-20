@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import toast from "react-hot-toast";
 import { Search, Filter, Plus, MoreVertical, Edit, Trash2, Power, PowerOff } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import axios from "axios";
@@ -87,7 +88,7 @@ export const MasterListPage = ({ title, endpoint, columns, user, permissions }: 
       setFormData({});
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || "An error occurred");
+      toast.error(error.response?.data?.message || "An error occurred");
     }
   });
 
@@ -101,7 +102,7 @@ export const MasterListPage = ({ title, endpoint, columns, user, permissions }: 
       queryClient.invalidateQueries({ queryKey: ["master-data", endpoint] });
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || "An error occurred");
+      toast.error(error.response?.data?.message || "An error occurred");
     }
   });
 
@@ -114,7 +115,7 @@ export const MasterListPage = ({ title, endpoint, columns, user, permissions }: 
       queryClient.invalidateQueries({ queryKey: ["master-data", endpoint] });
     },
     onError: (error: any) => {
-      alert(error.response?.data?.message || "An error occurred");
+      toast.error(error.response?.data?.message || "An error occurred");
     }
   });
 
@@ -222,7 +223,7 @@ export const MasterListPage = ({ title, endpoint, columns, user, permissions }: 
                         </button>
                       )}
                       {canDelete && (
-                        <button onClick={() => { if(confirm('Are you sure you want to delete this item?')) deleteMutation.mutate(item.id) }} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-rose-400 transition-colors">
+                        <button onClick={() => { if(window.confirm('Are you sure you want to delete this item?')) deleteMutation.mutate(item.id) }} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-rose-400 transition-colors">
                           <Trash2 size={16} />
                         </button>
                       )}

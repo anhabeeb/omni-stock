@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import toast from 'react-hot-toast';
 import { 
   Paperclip, 
   Upload, 
@@ -57,11 +58,11 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({ entityType
       if (res.ok) {
         await fetchAttachments();
       } else {
-        alert('Failed to upload attachment.');
+        toast.error('Failed to upload attachment.');
       }
     } catch (error) {
       console.error('Error uploading attachment:', error);
-      alert('Error uploading attachment.');
+      toast.error('Error uploading attachment.');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -69,7 +70,7 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({ entityType
   };
 
   const deleteAttachment = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this attachment?')) return;
+    if (!window.confirm('Are you sure you want to delete this attachment?')) return;
 
     try {
       const res = await fetch(`/api/attachments/${id}`, { method: 'DELETE' , headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });

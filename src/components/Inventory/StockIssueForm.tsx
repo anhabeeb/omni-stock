@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { Plus, Trash2, Save, ArrowLeft, Search, Scan, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import BarcodeScanModal from '../Common/BarcodeScanModal';
@@ -88,7 +89,7 @@ const StockIssueForm: React.FC = () => {
       navigate('/inventory/issues');
     },
     onError: (error: any) => {
-      alert(error.message);
+      toast.error(error.message);
     }
   });
 
@@ -139,7 +140,7 @@ const StockIssueForm: React.FC = () => {
         }]
       });
     } else {
-      alert("Item not found for this barcode");
+      toast.error("Item not found for this barcode");
     }
   };
 

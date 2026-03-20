@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { 
   Search, Package, Warehouse, Filter, RefreshCw, 
   ChevronRight, ScanLine, AlertTriangle, Clock, AlertCircle
@@ -65,7 +66,7 @@ export default function MobileInventory() {
       const data = await res.json();
       setSelectedItem(data);
     } else {
-      alert("Item not found");
+      toast.error("Item not found");
     }
   };
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import toast from 'react-hot-toast';
 import { 
   Settings as SettingsIcon, 
   Globe, 
@@ -119,7 +120,7 @@ export default function SettingsPage() {
       await axios.post('/api/onboarding/self-reset');
       window.location.reload(); // Reload to trigger the tutorial check in App.tsx
     } catch (err) {
-      alert("Failed to reset tutorial");
+      toast.error("Failed to reset tutorial");
     }
   };
 

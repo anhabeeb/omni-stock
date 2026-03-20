@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { 
   ClipboardList, Plus, Search, Filter, 
   ChevronRight, CheckCircle2, XCircle, 
@@ -163,7 +164,7 @@ export default function StockCount() {
       queryClient.invalidateQueries({ queryKey: ["stock"] });
     },
     onError: (error: any) => {
-      alert(error.message);
+      toast.error(error.message);
     }
   });
 
@@ -175,7 +176,7 @@ export default function StockCount() {
       const element = document.getElementById(`item-${item.id}`);
       if (element) element.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else {
-      alert("Item not found in this count session. Ensure it has stock in this godown.");
+      toast.error("Item not found in this count session. Ensure it has stock in this godown.");
     }
   };
 
@@ -189,7 +190,7 @@ export default function StockCount() {
       setPrintSession(data);
     } catch (error) {
       console.error('Error fetching session details:', error);
-      alert('Failed to load session details for printing');
+      toast.error('Failed to load session details for printing');
     }
   };
 
