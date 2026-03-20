@@ -54,30 +54,57 @@ export class EventListenerService {
     // 1. Invalidate TanStack Query
     if (entity_type === 'item') {
       queryClient.invalidateQueries({ queryKey: ["master-data", "items"] });
-      await LocalSyncService.syncMasterData('item');
     } else if (entity_type === 'supplier') {
       queryClient.invalidateQueries({ queryKey: ["master-data", "suppliers"] });
-      await LocalSyncService.syncMasterData('supplier');
     } else if (entity_type === 'godown') {
       queryClient.invalidateQueries({ queryKey: ["master-data", "godowns"] });
-      await LocalSyncService.syncMasterData('godown');
     } else if (entity_type === 'outlet') {
       queryClient.invalidateQueries({ queryKey: ["master-data", "outlets"] });
-      await LocalSyncService.syncMasterData('outlet');
     } else if (entity_type === 'category') {
       queryClient.invalidateQueries({ queryKey: ["master-data", "categories"] });
-      await LocalSyncService.syncMasterData('category');
     } else if (entity_type === 'unit') {
       queryClient.invalidateQueries({ queryKey: ["master-data", "units"] });
-      await LocalSyncService.syncMasterData('unit');
-    } else if (entity_type === 'inventory' || entity_type === 'grn') {
+    } else if (event_type === 'inventory.changed') {
+      queryClient.invalidateQueries({ queryKey: ["current-stock"] });
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
-      queryClient.invalidateQueries({ queryKey: ["stock-batches"] });
-    }
-
-    // Generic invalidation for any change
-    if (event_type.includes('updated') || event_type.includes('created') || event_type.includes('deleted')) {
-       // Optional: more specific invalidations
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
+      queryClient.invalidateQueries({ queryKey: ["batches"] });
+      queryClient.invalidateQueries({ queryKey: ["expiry-alerts"] });
+    } else if (event_type === 'grn.posted') {
+      queryClient.invalidateQueries({ queryKey: ["grn"] });
+      queryClient.invalidateQueries({ queryKey: ["current-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
+    } else if (event_type === 'issue.posted') {
+      queryClient.invalidateQueries({ queryKey: ["issues"] });
+      queryClient.invalidateQueries({ queryKey: ["current-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
+    } else if (event_type === 'transfer.dispatched' || event_type === 'transfer.received') {
+      queryClient.invalidateQueries({ queryKey: ["transfers"] });
+      queryClient.invalidateQueries({ queryKey: ["current-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
+    } else if (event_type === 'adjustment.posted') {
+      queryClient.invalidateQueries({ queryKey: ["adjustments"] });
+      queryClient.invalidateQueries({ queryKey: ["current-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["movements"] });
+    } else if (event_type === 'stockcount.posted') {
+      queryClient.invalidateQueries({ queryKey: ["stock-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["current-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    } else if (event_type === 'wastage.posted') {
+      queryClient.invalidateQueries({ queryKey: ["wastage"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["alerts"] });
+    } else if (event_type === 'request.updated') {
+      queryClient.invalidateQueries({ queryKey: ["requests"] });
+    } else if (event_type === 'notification.created') {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    } else if (event_type === 'settings.updated') {
+      queryClient.invalidateQueries({ queryKey: ["settings"] });
     }
   }
 }

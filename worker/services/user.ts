@@ -145,6 +145,10 @@ export class UserService {
     await this.db.prepare("UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(passwordHash, id).run();
   }
 
+  async getRoleById(id: string): Promise<Role> {
+    return await this.db.prepare("SELECT * FROM roles WHERE id = ?").bind(id).first() as Role;
+  }
+
   async getRoles(): Promise<Role[]> {
     const { results } = await this.db.prepare("SELECT * FROM roles ORDER BY name ASC").all();
     return results as Role[];

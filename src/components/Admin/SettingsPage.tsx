@@ -15,6 +15,7 @@ import {
   Sun,
   Laptop
 } from 'lucide-react';
+import { SystemReset } from './SystemReset';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { cn } from '../../utils/cn';
@@ -113,6 +114,7 @@ export default function SettingsPage() {
     { id: 'ui', label: 'UI & Theme', icon: Palette },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'tutorial', label: 'Tutorial', icon: Clock },
+    { id: 'danger', label: 'Danger Zone', icon: AlertTriangle },
   ];
 
   const handleRestartTutorial = async () => {
@@ -356,7 +358,6 @@ export default function SettingsPage() {
                       </div>
                     </div>
                   )}
-
                   {activeTab === 'tutorial' && (
                     <div className="space-y-6">
                       <div className="max-w-md">
@@ -374,6 +375,12 @@ export default function SettingsPage() {
                           Restart Tutorial
                         </button>
                       </div>
+                    </div>
+                  )}
+
+                  {activeTab === 'danger' && (
+                    <div className="space-y-6">
+                      <SystemReset />
                     </div>
                   )}
                 </motion.div>

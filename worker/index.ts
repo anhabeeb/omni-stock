@@ -21,6 +21,7 @@ const grnSchema = z.object({
 });
 import { jwt, sign, verify } from 'hono/jwt';
 import { cors } from 'hono/cors';
+import { ResetService } from './services/reset';
 import { InventoryService } from './services/inventory';
 import { ReportingService } from './services/reporting';
 import { StockCountService } from './services/stockCount';
@@ -213,6 +214,59 @@ app.post("/api/auth/login", rateLimiter, async (c) => {
       permissions
     } 
   });
+});
+
+// System Reset
+app.post("/api/system-reset/request-otp", authMiddleware, async (c) => {
+  const user = c.get('user');
+  if (user.role_name !== 'super_admin') return c.json({ message: "Forbidden" }, 403);
+  if (!user.email) return c.json({ message: "No email configured" }, 400);
+
+  const resetService = new ResetService(c.env.DB);
+  await resetService.requestOtp(user.id, user.email);
+  return c.json({ success: true });
+});
+
+app.post("/api/system-reset/verify-otp", authMiddleware, async (c) => {
+  const user = c.get('user');
+  if (user.role_name !== 'super_admin') return c.json({ message: "Forbidden" }, 403);
+  
+  const { otp } = await c.req.json();
+  const resetService = new ResetService(c.env.DB);
+  
+  try {
+    await resetService.verifyOtp(user.email, otp);
+  } catch (e: any) {
+    return c.json({ message: e.message }, 400);
+  }
+  
+  const secret = c.env.JWT_SECRET || "omnistock-secret-key-2026";
+  const token = await sign({ userId: user.id, purpose: 'reset' }, secret);
+  return c.json({ token });
+});
+
+app.post("/api/system-reset/execute", authMiddleware, async (c) => {
+  const user = c.get('user');
+  if (user.role_name !== 'super_admin') return c.json({ message: "Forbidden" }, 403);
+  
+  const { token, confirmation } = await c.req.json();
+  if (confirmation !== "RESET ENTIRE DATABASE") return c.json({ message: "Invalid confirmation" }, 400);
+  
+  const secret = c.env.JWT_SECRET || "omnistock-secret-key-2026";
+  try {
+    const payload = await verify(token, secret, 'HS256');
+    if (payload.userId !== user.id || payload.purpose !== 'reset') throw new Error("Invalid token");
+  } catch (e) {
+    return c.json({ message: "Invalid reset token" }, 401);
+  }
+  
+  const resetService = new ResetService(c.env.DB);
+  await resetService.executeWipe();
+  
+  // Invalidate caches/sessions
+  await CacheManager.invalidate(c);
+  
+  return c.json({ success: true });
 });
 
 // Events Poll
@@ -1870,4 +1924,8 @@ app.get("/api/smart-alerts/wastage-anomalies", authMiddleware, requirePermission
   return CacheManager.put(c, c.json(alerts), 120);
 });
 
+
+// ... (existing routes)
+
 export default app;
+

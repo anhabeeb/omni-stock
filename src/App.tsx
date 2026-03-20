@@ -798,6 +798,15 @@ function AppContent() {
   const [isReady, setIsReady] = useState(false);
   const [isInitialized, setIsInitialized] = useState<boolean | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      EventListenerService.start(queryClient);
+    } else {
+      EventListenerService.stop();
+    }
+    return () => EventListenerService.stop();
+  }, [user, queryClient]);
   const { width } = useWindowSize();
   const isMobile = width < 768;
   const [mobileTab, setMobileTab] = useState('dashboard');
