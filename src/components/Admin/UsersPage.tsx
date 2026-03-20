@@ -180,6 +180,7 @@ export default function UsersPage() {
 
   const exportData = users.map(u => ({
     ...u,
+    role_name: u.role_name || 'Unassigned Role',
     is_active: u.is_active ? 'Active' : 'Inactive',
     last_login: u.last_login ? new Date(u.last_login).toLocaleString() : 'Never'
   }));
@@ -270,7 +271,7 @@ export default function UsersPage() {
                   <td className="px-6 py-4">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
                       <Shield size={12} />
-                      {user.role_name}
+                      {user.role_name || 'Unassigned Role'}
                     </span>
                   </td>
                   <td className="px-6 py-4">

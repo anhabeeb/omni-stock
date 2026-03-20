@@ -35,7 +35,7 @@ export class UserService {
     let query = `
       SELECT u.*, r.name as role_name 
       FROM users u 
-      JOIN roles r ON u.role_id = r.id 
+      LEFT JOIN roles r ON u.role_id = r.id 
       WHERE 1=1
     `;
     const params: any[] = [];
@@ -66,7 +66,7 @@ export class UserService {
     return await this.db.prepare(`
       SELECT u.*, r.name as role_name 
       FROM users u 
-      JOIN roles r ON u.role_id = r.id 
+      LEFT JOIN roles r ON u.role_id = r.id 
       WHERE LOWER(u.username) = LOWER(?) AND u.is_active = 1
     `).bind(username).first() as User;
   }
@@ -75,7 +75,7 @@ export class UserService {
     return await this.db.prepare(`
       SELECT u.*, r.name as role_name 
       FROM users u 
-      JOIN roles r ON u.role_id = r.id 
+      LEFT JOIN roles r ON u.role_id = r.id 
       WHERE LOWER(u.username) = LOWER(?) AND u.is_active = 1
     `).bind(username).first() as User;
   }
@@ -84,7 +84,7 @@ export class UserService {
     return await this.db.prepare(`
       SELECT u.*, r.name as role_name 
       FROM users u 
-      JOIN roles r ON u.role_id = r.id 
+      LEFT JOIN roles r ON u.role_id = r.id 
       WHERE u.id = ?
     `).bind(id).first() as User;
   }

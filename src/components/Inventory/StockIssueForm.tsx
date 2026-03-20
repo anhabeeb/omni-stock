@@ -12,7 +12,7 @@ const StockIssueForm: React.FC = () => {
   
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
-  const canView = hasPermission('inventory.issue');
+  const canView = hasPermission('inventory.issue.create');
 
   const [formData, setFormData] = useState({
     issue_number: `ISS-${Date.now()}`,

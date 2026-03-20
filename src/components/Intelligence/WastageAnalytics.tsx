@@ -32,7 +32,7 @@ export const WastageAnalytics: React.FC = () => {
   const { format } = useSettings();
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
-  const canView = hasPermission('intelligence.view');
+  const canView = hasPermission('kpi.view');
 
   const { data, isLoading } = useQuery<WastageAnalyticsData>({
     queryKey: ['wastage', 'analytics'],

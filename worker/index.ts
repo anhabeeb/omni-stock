@@ -713,7 +713,7 @@ app.get("/api/grn", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.post("/api/grn", authMiddleware, requirePermission('inventory.grn'), async (c) => {
+app.post("/api/grn", authMiddleware, requirePermission('inventory.grn.create'), async (c) => {
   try {
     const body = await c.req.json();
     const validatedData = grnSchema.parse(body);
@@ -761,7 +761,7 @@ app.get("/api/grn/:id", authMiddleware, async (c) => {
   return c.json({ ...grn, items });
 });
 
-app.post("/api/grn/:id/post", authMiddleware, requirePermission('inventory.grn'), async (c) => {
+app.post("/api/grn/:id/post", authMiddleware, requirePermission('inventory.grn.post'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const inventoryService = new InventoryService(c.env.DB);
@@ -774,7 +774,7 @@ app.post("/api/grn/:id/post", authMiddleware, requirePermission('inventory.grn')
   }
 });
 
-app.post("/api/grn/:id/cancel", authMiddleware, requirePermission('inventory.grn'), async (c) => {
+app.post("/api/grn/:id/cancel", authMiddleware, requirePermission('inventory.grn.post'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const inventoryService = new InventoryService(c.env.DB);
@@ -795,7 +795,7 @@ app.get("/api/issues", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.post("/api/issues", authMiddleware, requirePermission('inventory.issue'), async (c) => {
+app.post("/api/issues", authMiddleware, requirePermission('inventory.issue.create'), async (c) => {
   const body = await c.req.json();
   const inventoryService = new InventoryService(c.env.DB);
   const idService = new IdService(c.env.DB);
@@ -856,7 +856,7 @@ app.get("/api/issues/:id", authMiddleware, async (c) => {
   return c.json({ ...issue, items: itemsWithAllocations });
 });
 
-app.post("/api/issues/:id/post", authMiddleware, requirePermission('inventory.issue'), async (c) => {
+app.post("/api/issues/:id/post", authMiddleware, requirePermission('inventory.issue.post'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const inventoryService = new InventoryService(c.env.DB);
@@ -902,7 +902,7 @@ app.get("/api/transfers/:id", authMiddleware, async (c) => {
   return c.json({ ...transfer, items });
 });
 
-app.post("/api/transfers", authMiddleware, requirePermission('inventory.transfer'), async (c) => {
+app.post("/api/transfers", authMiddleware, requirePermission('inventory.transfer.create'), async (c) => {
   const body = await c.req.json();
   const inventoryService = new InventoryService(c.env.DB);
   const idService = new IdService(c.env.DB);
@@ -945,7 +945,7 @@ app.post("/api/transfers", authMiddleware, requirePermission('inventory.transfer
   }
 });
 
-app.post("/api/transfers/:id/dispatch", authMiddleware, requirePermission('inventory.transfer'), async (c) => {
+app.post("/api/transfers/:id/dispatch", authMiddleware, requirePermission('inventory.transfer.dispatch'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const inventoryService = new InventoryService(c.env.DB);
@@ -958,7 +958,7 @@ app.post("/api/transfers/:id/dispatch", authMiddleware, requirePermission('inven
   }
 });
 
-app.post("/api/transfers/:id/receive", authMiddleware, requirePermission('inventory.transfer'), async (c) => {
+app.post("/api/transfers/:id/receive", authMiddleware, requirePermission('inventory.transfer.receive'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const inventoryService = new InventoryService(c.env.DB);
@@ -979,7 +979,7 @@ app.get("/api/adjustments", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.post("/api/adjustments", authMiddleware, requirePermission('inventory.adjust'), async (c) => {
+app.post("/api/adjustments", authMiddleware, requirePermission('inventory.adjustment.create'), async (c) => {
   const body = await c.req.json();
   const inventoryService = new InventoryService(c.env.DB);
   const idService = new IdService(c.env.DB);
@@ -1017,7 +1017,7 @@ app.post("/api/adjustments", authMiddleware, requirePermission('inventory.adjust
   }
 });
 
-app.post("/api/adjustments/:id/post", authMiddleware, requirePermission('inventory.adjust'), async (c) => {
+app.post("/api/adjustments/:id/post", authMiddleware, requirePermission('inventory.adjustment.post'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const inventoryService = new InventoryService(c.env.DB);
@@ -1160,7 +1160,7 @@ app.get("/api/stock-counts", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(results), 60);
 });
 
-app.post("/api/stock-counts", authMiddleware, requirePermission('inventory.count'), async (c) => {
+app.post("/api/stock-counts", authMiddleware, requirePermission('stockcount.create'), async (c) => {
   const { godown_id, remarks } = await c.req.json();
   const user = c.get('jwtPayload') as any;
   const service = new StockCountService(c.env.DB);
@@ -1185,7 +1185,7 @@ app.get("/api/stock-counts/:id", authMiddleware, async (c) => {
   return c.json({ ...session, items });
 });
 
-app.post("/api/stock-counts/:id/load-system-stock", authMiddleware, requirePermission('inventory.count'), async (c) => {
+app.post("/api/stock-counts/:id/load-system-stock", authMiddleware, requirePermission('stockcount.create'), async (c) => {
   const id = c.req.param('id');
   const service = new StockCountService(c.env.DB);
   await service.loadSystemStock(id);
@@ -1193,7 +1193,7 @@ app.post("/api/stock-counts/:id/load-system-stock", authMiddleware, requirePermi
   return c.json({ message: "System stock loaded" });
 });
 
-app.put("/api/stock-counts/items/:itemId", authMiddleware, requirePermission('inventory.count'), async (c) => {
+app.put("/api/stock-counts/items/:itemId", authMiddleware, requirePermission('stockcount.create'), async (c) => {
   const itemId = c.req.param('itemId');
   const { counted_quantity, entered_unit_id, remarks } = await c.req.json();
   const service = new StockCountService(c.env.DB);
@@ -1211,7 +1211,7 @@ app.post("/api/stock-counts/:id/submit", authMiddleware, async (c) => {
   return c.json({ message: "Session submitted" });
 });
 
-app.post("/api/stock-counts/:id/approve", authMiddleware, requirePermission('inventory.count'), async (c) => {
+app.post("/api/stock-counts/:id/approve", authMiddleware, requirePermission('stockcount.approve'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const service = new StockCountService(c.env.DB);
@@ -1220,7 +1220,7 @@ app.post("/api/stock-counts/:id/approve", authMiddleware, requirePermission('inv
   return c.json({ message: "Session approved" });
 });
 
-app.post("/api/stock-counts/:id/post", authMiddleware, requirePermission('inventory.count'), async (c) => {
+app.post("/api/stock-counts/:id/post", authMiddleware, requirePermission('stockcount.post'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const service = new StockCountService(c.env.DB);
@@ -1254,7 +1254,7 @@ app.get("/api/wastage/analytics", authMiddleware, async (c) => {
   return CacheManager.put(c, c.json(analytics), 60);
 });
 
-app.post("/api/wastage", authMiddleware, requirePermission('inventory.wastage'), async (c) => {
+app.post("/api/wastage", authMiddleware, requirePermission('wastage.create'), async (c) => {
   const body = await c.req.json();
   const user = c.get('jwtPayload') as any;
   const service = new WastageService(c.env.DB);
@@ -1276,7 +1276,7 @@ app.get("/api/wastage/:id", authMiddleware, async (c) => {
   return c.json({ ...record, items });
 });
 
-app.post("/api/wastage/:id/post", authMiddleware, requirePermission('inventory.wastage'), async (c) => {
+app.post("/api/wastage/:id/post", authMiddleware, requirePermission('wastage.post'), async (c) => {
   const id = c.req.param('id');
   const user = c.get('jwtPayload') as any;
   const service = new WastageService(c.env.DB);
@@ -1358,7 +1358,7 @@ app.post("/api/requests/:id/submit", authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
-app.post("/api/requests/:id/approve", authMiddleware, requirePermission('inventory.issue'), async (c) => {
+app.post("/api/requests/:id/approve", authMiddleware, requirePermission('requests.approve'), async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json();
   const payload = c.get('jwtPayload') as any;
@@ -1542,7 +1542,7 @@ app.get("/api/batches/lookup-by-code", authMiddleware, rateLimiter, async (c) =>
   return c.json(batch || { message: "Batch not found" }, batch ? 200 : 404);
 });
 
-app.post("/api/items/:id/barcodes", authMiddleware, requirePermission('inventory.view'), async (c) => {
+app.post("/api/items/:id/barcodes", authMiddleware, requirePermission('barcodes.manage'), async (c) => {
   const itemId = c.req.param('id');
   const { barcode, type } = await c.req.json();
   const service = new BarcodeService(c.env.DB);
@@ -1558,7 +1558,7 @@ app.get("/api/items/:id/barcodes", authMiddleware, async (c) => {
   return c.json(results);
 });
 
-app.delete("/api/items/barcodes/:barcodeId", authMiddleware, requirePermission('inventory.view'), async (c) => {
+app.delete("/api/items/barcodes/:barcodeId", authMiddleware, requirePermission('barcodes.manage'), async (c) => {
   const barcodeId = c.req.param('barcodeId');
   const service = new BarcodeService(c.env.DB);
   await service.deleteBarcode(barcodeId);

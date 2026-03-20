@@ -20,7 +20,7 @@ export default function AnalyticsDashboard() {
   const { format } = useSettings();
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
-  const canView = hasPermission('dashboard.view');
+  const canView = hasPermission('kpi.view');
 
   const [summary, setSummary] = useState<any>(null);
   const [stockByGodown, setStockByGodown] = useState<any[]>([]);

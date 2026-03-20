@@ -25,7 +25,7 @@ interface StockRequestListProps {
 export const StockRequestList: React.FC<StockRequestListProps> = ({ onNewRequest, onViewRequest }) => {
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
-  const canView = hasPermission('operations.view');
+  const canView = hasPermission('requests.view');
 
   const [requests, setRequests] = useState<StockRequest[]>([]);
   const [outlets, setOutlets] = useState<Outlet[]>([]);

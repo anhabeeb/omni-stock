@@ -129,7 +129,7 @@ const PermissionGate = ({
   user: User,
   fallback?: React.ReactNode
 }) => {
-  const hasPermission = user.role === 'super_admin' || user.permissions.includes(permission);
+  const hasPermission = user.role === 'super_admin' || user.permissions?.includes(permission);
   if (!hasPermission) return <>{fallback}</>;
   return <>{children}</>;
 };
@@ -183,7 +183,7 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
           <SidebarItem icon={LayoutDashboard} label="Dashboard" to="/" active={location.pathname === "/"} />
           
           <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Reports & Analytics</div>
-          <PermissionGate user={user} permission="analytics.view">
+          <PermissionGate user={user} permission="kpi.view">
             <SidebarItem icon={BarChart3} label="Analytics" to="/analytics" active={location.pathname === "/analytics"} />
           </PermissionGate>
           
@@ -205,7 +205,7 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
             <SidebarItem icon={History} label="Movement Ledger" to="/ledger" active={location.pathname === "/ledger"} />
           </PermissionGate>
 
-          <PermissionGate user={user} permission="intelligence.view">
+          <PermissionGate user={user} permission="kpi.view">
             <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Warehouse Intelligence</div>
             <SidebarItem icon={BarChart3} label="Warehouse KPIs" to="/intelligence/kpis" active={location.pathname === "/intelligence/kpis"} />
             <SidebarItem icon={Trash2} label="Wastage Analytics" to="/intelligence/wastage" active={location.pathname === "/intelligence/wastage"} />
@@ -214,27 +214,27 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
           </PermissionGate>
 
           <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Warehouse Control</div>
-          <PermissionGate user={user} permission="stock_requests.view">
+          <PermissionGate user={user} permission="requests.view">
             <SidebarItem icon={Truck} label="Stock Requests" to="/requests" active={location.pathname === "/requests"} />
           </PermissionGate>
 
           <div className="px-4 py-2 mt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Inventory Ops</div>
-          <PermissionGate user={user} permission="inventory.grn">
+          <PermissionGate user={user} permission="inventory.grn.create">
             <SidebarItem icon={PlusCircle} label="New GRN" to="/grn/new" active={location.pathname === "/grn/new"} />
           </PermissionGate>
-          <PermissionGate user={user} permission="inventory.issue">
+          <PermissionGate user={user} permission="inventory.issue.create">
             <SidebarItem icon={FileText} label="New Issue" to="/issues/new" active={location.pathname === "/issues/new"} />
           </PermissionGate>
-          <PermissionGate user={user} permission="inventory.transfer">
+          <PermissionGate user={user} permission="inventory.transfer.create">
             <SidebarItem icon={ArrowRightLeft} label="New Transfer" to="/transfers/new" active={location.pathname === "/transfers/new"} />
           </PermissionGate>
-          <PermissionGate user={user} permission="inventory.adjust">
+          <PermissionGate user={user} permission="inventory.adjustment.create">
             <SidebarItem icon={Settings2} label="New Adjustment" to="/adjustments/new" active={location.pathname === "/adjustments/new"} />
           </PermissionGate>
-          <PermissionGate user={user} permission="inventory.count">
+          <PermissionGate user={user} permission="stockcount.create">
             <SidebarItem icon={ClipboardList} label="Stock Count" to="/stock-count" active={location.pathname === "/stock-count"} />
           </PermissionGate>
-          <PermissionGate user={user} permission="inventory.wastage">
+          <PermissionGate user={user} permission="wastage.create">
             <SidebarItem icon={Trash2} label="Wastage" to="/wastage" active={location.pathname === "/wastage"} />
           </PermissionGate>
 
@@ -308,7 +308,7 @@ const Layout = ({ children, user, onLogout }: { children: React.ReactNode, user:
             <NotificationCenter />
             <div className="flex flex-col items-end">
               <span className={cn("text-sm font-medium", theme === 'dark' ? "text-white" : "text-slate-900")}>{user.fullName}</span>
-              <span className="text-xs text-slate-400 uppercase tracking-wider">{user.role.replace("_", " ")}</span>
+              <span className="text-xs text-slate-400 uppercase tracking-wider">{(user.role || 'Unassigned').replace("_", " ")}</span>
             </div>
             <div className={cn("w-10 h-10 rounded-full border flex items-center justify-center font-bold", theme === 'dark' ? "bg-slate-800 border-slate-700 text-emerald-400" : "bg-slate-100 border-slate-200 text-emerald-600")}>
               {user.fullName.charAt(0)}

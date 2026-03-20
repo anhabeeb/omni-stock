@@ -31,7 +31,7 @@ export const StockRequestForm: React.FC<StockRequestFormProps> = ({ requestId, o
 
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
-  const canView = hasPermission('operations.view');
+  const canView = hasPermission('requests.view');
 
   const [formData, setFormData] = useState({
     outlet_id: '',

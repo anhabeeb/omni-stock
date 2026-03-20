@@ -14,7 +14,7 @@ const GRNForm: React.FC = () => {
   
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
-  const canView = hasPermission('inventory.grn');
+  const canView = hasPermission('inventory.grn.create');
 
   const [formData, setFormData] = useState({
     grn_number: `GRN-${Date.now()}`,

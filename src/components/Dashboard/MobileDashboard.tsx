@@ -16,7 +16,7 @@ export default function MobileDashboard({ user, onTabChange }: { user: any, onTa
     if (currentUser.role === 'super_admin') return true;
     return currentUser.permissions?.includes(permission);
   };
-  const canView = hasPermission('dashboard.view');
+  const canView = hasPermission('kpi.view');
 
   const fetchSummary = async () => {
     if (!canView) {
@@ -95,7 +95,7 @@ export default function MobileDashboard({ user, onTabChange }: { user: any, onTa
           Quick Actions
         </h3>
         <div className="grid grid-cols-2 gap-3">
-          {hasPermission('inventory.grn') && (
+          {hasPermission('inventory.grn.create') && (
             <button 
               onClick={() => onTabChange('grn')}
               className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-2xl border border-slate-800 hover:bg-slate-800 transition-all"
@@ -106,7 +106,7 @@ export default function MobileDashboard({ user, onTabChange }: { user: any, onTa
               <span className="text-xs font-bold">Receive</span>
             </button>
           )}
-          {hasPermission('inventory.issue') && (
+          {hasPermission('inventory.issue.create') && (
             <button 
               onClick={() => onTabChange('issue')}
               className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-2xl border border-slate-800 hover:bg-slate-800 transition-all"

@@ -20,18 +20,18 @@ export default function MobileLayout({ children, activeTab, onTabChange, user, o
   const tabs = [
     { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
     { id: 'inventory', label: 'Stock', icon: Package, permission: 'inventory.view' },
-    { id: 'operations', label: 'Ops', icon: ScanLine, permission: 'operations.view' },
+    { id: 'operations', label: 'Ops', icon: ScanLine, permission: 'inventory.view' },
     { id: 'alerts', label: 'Alerts', icon: AlertCircle, permission: 'alerts.view' },
   ];
 
   const filteredTabs = tabs.filter(tab => !tab.permission || user?.role === 'super_admin' || user?.permissions?.includes(tab.permission));
 
   const menuItems = [
-    { id: 'grn', label: 'Receive Stock (GRN)', icon: ArrowDownLeft, permission: 'inventory.grn' },
-    { id: 'issue', label: 'Issue to Outlet', icon: ArrowUpRight, permission: 'inventory.issue' },
-    { id: 'transfer', label: 'Transfer Stock', icon: RefreshCw, permission: 'inventory.transfer' },
-    { id: 'stock-count', label: 'Stock Count', icon: Search, permission: 'inventory.count' },
-    { id: 'wastage', label: 'Wastage Entry', icon: Trash2, permission: 'inventory.wastage' },
+    { id: 'grn', label: 'Receive Stock (GRN)', icon: ArrowDownLeft, permission: 'inventory.grn.create' },
+    { id: 'issue', label: 'Issue to Outlet', icon: ArrowUpRight, permission: 'inventory.issue.create' },
+    { id: 'transfer', label: 'Transfer Stock', icon: RefreshCw, permission: 'inventory.transfer.create' },
+    { id: 'stock-count', label: 'Stock Count', icon: Search, permission: 'stockcount.create' },
+    { id: 'wastage', label: 'Wastage Entry', icon: Trash2, permission: 'wastage.create' },
     { id: 'finance', label: 'Finance & Profit', icon: BarChart3, permission: 'finance.view' },
   ];
 

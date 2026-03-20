@@ -11,7 +11,7 @@ export default function MobileOperations({ onAction }: { onAction: (action: stri
     if (currentUser.role === 'super_admin') return true;
     return currentUser.permissions?.includes(permission);
   };
-  const canView = hasPermission('operations.view');
+  const canView = hasPermission('inventory.view');
 
   if (!canView) {
     return (
@@ -28,11 +28,11 @@ export default function MobileOperations({ onAction }: { onAction: (action: stri
   }
 
   const operations = [
-    { id: 'grn', label: 'Receive Stock', sub: 'GRN', icon: ArrowDownLeft, color: 'emerald', permission: 'inventory.grn' },
-    { id: 'issue', label: 'Issue to Outlet', sub: 'Issue', icon: ArrowUpRight, color: 'blue', permission: 'inventory.issue' },
-    { id: 'transfer', label: 'Transfer Stock', sub: 'Transfer', icon: RefreshCw, color: 'violet', permission: 'inventory.transfer' },
-    { id: 'stock-count', label: 'Stock Count', sub: 'Audit', icon: Search, color: 'amber', permission: 'inventory.count' },
-    { id: 'wastage', label: 'Wastage Entry', sub: 'Loss', icon: Trash2, color: 'rose', permission: 'inventory.wastage' },
+    { id: 'grn', label: 'Receive Stock', sub: 'GRN', icon: ArrowDownLeft, color: 'emerald', permission: 'inventory.grn.create' },
+    { id: 'issue', label: 'Issue to Outlet', sub: 'Issue', icon: ArrowUpRight, color: 'blue', permission: 'inventory.issue.create' },
+    { id: 'transfer', label: 'Transfer Stock', sub: 'Transfer', icon: RefreshCw, color: 'violet', permission: 'inventory.transfer.create' },
+    { id: 'stock-count', label: 'Stock Count', sub: 'Audit', icon: Search, color: 'amber', permission: 'stockcount.create' },
+    { id: 'wastage', label: 'Wastage Entry', sub: 'Loss', icon: Trash2, color: 'rose', permission: 'wastage.create' },
   ];
 
   return (

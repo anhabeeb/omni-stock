@@ -13,7 +13,7 @@ const AdjustmentForm: React.FC = () => {
   
   const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   const hasPermission = (p: string) => currentUser.role === 'super_admin' || currentUser.permissions?.includes(p);
-  const canView = hasPermission('inventory.adjust');
+  const canView = hasPermission('inventory.adjustment.create');
 
   const [formData, setFormData] = useState({
     adjustment_number: `ADJ-${Date.now()}`,
