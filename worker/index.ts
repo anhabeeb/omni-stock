@@ -48,7 +48,7 @@ import { hashPassword, verifyPassword } from './utils/auth';
 type Bindings = {
   DB: D1Database;
   BUCKET: R2Bucket;
-  "omni-stock": KVNamespace;
+  KV: KVNamespace;
   JWT_SECRET: string;
 };
 
@@ -71,7 +71,7 @@ app.use('*', async (c, next) => {
 });
 
 const rateLimiter = async (c: any, next: any) => {
-  if (!c.env['omni-stock']) {
+  if (!c.env.KV) {
     await next();
     return;
   }
@@ -79,14 +79,14 @@ const rateLimiter = async (c: any, next: any) => {
   const path = c.req.path;
   const key = `ratelimit:${ip}:${path}`;
   
-  const current = await c.env['omni-stock'].get(key);
+  const current = await c.env.KV.get(key);
   const count = current ? parseInt(current) : 0;
   
   if (count >= 100) { // 100 requests per window
     return c.json({ message: "Too many requests" }, 429);
   }
   
-  await c.env['omni-stock'].put(key, (count + 1).toString(), { expirationTtl: 60 }); // 1 minute window
+  await c.env.KV.put(key, (count + 1).toString(), { expirationTtl: 60 }); // 1 minute window
   await next();
 };
 
@@ -334,6 +334,7 @@ app.post("/api/users", authMiddleware, requirePermission('users.create'), async 
   const passwordHash = await hashPassword(data.password || "omnistock123");
   const id = await userService.createUser({ ...data, password_hash: passwordHash });
   
+  await CacheManager.invalidate(c);
   return c.json({ id, message: "User created successfully" }, 201);
 });
 
@@ -357,6 +358,7 @@ app.put("/api/users/:id", authMiddleware, requirePermission('users.update'), asy
   }
 
   await userService.updateUser(id, data);
+  await CacheManager.invalidate(c);
   return c.json({ message: "User updated successfully" });
 });
 
@@ -375,6 +377,7 @@ app.post("/api/users/:id/deactivate", authMiddleware, requirePermission('users.d
   }
 
   await userService.deactivateUser(id);
+  await CacheManager.invalidate(c);
   return c.json({ message: "User deactivated" });
 });
 
@@ -382,6 +385,7 @@ app.post("/api/users/:id/reactivate", authMiddleware, requirePermission('users.u
   const id = c.req.param('id');
   const userService = new UserService(c.env.DB);
   await userService.reactivateUser(id);
+  await CacheManager.invalidate(c);
   return c.json({ message: "User reactivated" });
 });
 
@@ -398,6 +402,7 @@ app.post("/api/users/:id/reset-password", authMiddleware, requirePermission('use
 
   const hash = await hashPassword(password);
   await userService.resetPassword(id, hash);
+  await CacheManager.invalidate(c);
   return c.json({ message: "Password reset successfully" });
 });
 
@@ -429,7 +434,7 @@ app.put("/api/settings", authMiddleware, requirePermission('settings.update'), a
 
 // Master Data
 app.get("/api/items", authMiddleware, requirePermission('master.items.view'), async (c) => {
-  const cached = await CacheManager.get(c, 600);
+  const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   
   const activeOnly = c.req.query("activeOnly") === "true";
@@ -439,7 +444,7 @@ app.get("/api/items", authMiddleware, requirePermission('master.items.view'), as
   }
   
   const { results } = await c.env.DB.prepare(query).all();
-  return CacheManager.put(c, c.json(results), 600);
+  return CacheManager.put(c, c.json(results), 60);
 });
 
 app.get("/api/items/:id", authMiddleware, requirePermission('master.items.view'), async (c) => {
@@ -527,7 +532,7 @@ app.delete("/api/items/:id", authMiddleware, requirePermission('master.items.dea
 
 // Suppliers
 app.get("/api/suppliers", authMiddleware, requirePermission('master.suppliers.view'), async (c) => {
-  const cached = await CacheManager.get(c, 600);
+  const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   
   const activeOnly = c.req.query("activeOnly") === "true";
@@ -537,7 +542,7 @@ app.get("/api/suppliers", authMiddleware, requirePermission('master.suppliers.vi
   }
   
   const { results } = await c.env.DB.prepare(query).all();
-  return CacheManager.put(c, c.json(results), 600);
+  return CacheManager.put(c, c.json(results), 60);
 });
 
 app.get("/api/suppliers/:id", authMiddleware, requirePermission('master.suppliers.view'), async (c) => {
@@ -624,7 +629,7 @@ app.delete("/api/suppliers/:id", authMiddleware, requirePermission('master.suppl
 
 // Godowns
 app.get("/api/godowns", authMiddleware, requirePermission('master.godowns.view'), async (c) => {
-  const cached = await CacheManager.get(c, 600);
+  const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   
   const activeOnly = c.req.query("activeOnly") === "true";
@@ -634,7 +639,7 @@ app.get("/api/godowns", authMiddleware, requirePermission('master.godowns.view')
   }
   
   const { results } = await c.env.DB.prepare(query).all();
-  return CacheManager.put(c, c.json(results), 600);
+  return CacheManager.put(c, c.json(results), 60);
 });
 
 app.get("/api/godowns/:id", authMiddleware, requirePermission('master.godowns.view'), async (c) => {
@@ -721,7 +726,7 @@ app.delete("/api/godowns/:id", authMiddleware, requirePermission('master.godowns
 
 // Outlets
 app.get("/api/outlets", authMiddleware, requirePermission('master.outlets.view'), async (c) => {
-  const cached = await CacheManager.get(c, 600);
+  const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   
   const activeOnly = c.req.query("activeOnly") === "true";
@@ -731,7 +736,7 @@ app.get("/api/outlets", authMiddleware, requirePermission('master.outlets.view')
   }
   
   const { results } = await c.env.DB.prepare(query).all();
-  return CacheManager.put(c, c.json(results), 600);
+  return CacheManager.put(c, c.json(results), 60);
 });
 
 app.get("/api/outlets/:id", authMiddleware, requirePermission('master.outlets.view'), async (c) => {
@@ -817,17 +822,17 @@ app.delete("/api/outlets/:id", authMiddleware, requirePermission('master.outlets
 });
 
 app.get("/api/categories", authMiddleware, requirePermission('master.categories.view'), async (c) => {
-  const cached = await CacheManager.get(c, 600);
+  const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare("SELECT * FROM categories").all();
-  return CacheManager.put(c, c.json(results), 600);
+  return CacheManager.put(c, c.json(results), 60);
 });
 
 app.get("/api/units", authMiddleware, requirePermission('master.units.view'), async (c) => {
-  const cached = await CacheManager.get(c, 600);
+  const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const { results } = await c.env.DB.prepare("SELECT * FROM units").all();
-  return CacheManager.put(c, c.json(results), 600);
+  return CacheManager.put(c, c.json(results), 60);
 });
 
 // GRN
@@ -1198,14 +1203,14 @@ app.post("/api/adjustments/:id/post", authMiddleware, requirePermission('invento
 
 // Dashboard Analytics
 app.get("/api/dashboard/summary", authMiddleware, requirePermission('kpi.view'), async (c) => {
-  const cached = await CacheManager.get(c, 30);
+  const cached = await CacheManager.get(c, 15);
   if (cached) return cached;
   const godownId = c.req.query('godownId');
   const from = c.req.query('from');
   const to = c.req.query('to');
   const reportingService = new ReportingService(c.env.DB);
   const summary = await reportingService.getDashboardSummary({ godownId, from, to });
-  return CacheManager.put(c, c.json(summary), 30);
+  return CacheManager.put(c, c.json(summary), 15);
 });
 
 app.get("/api/dashboard/stock-by-godown", authMiddleware, requirePermission('kpi.view'), async (c) => {
@@ -1291,25 +1296,25 @@ app.get("/api/reports/movements", authMiddleware, requirePermission('reports.vie
 });
 
 app.get("/api/reports/valuation", authMiddleware, requirePermission('reports.view'), async (c) => {
-  const cached = await CacheManager.get(c, 120);
+  const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const groupBy = (c.req.query('groupBy') || 'item') as any;
   const limit = parseInt(c.req.query('limit') || "50");
   const offset = parseInt(c.req.query('offset') || "0");
   const reportingService = new ReportingService(c.env.DB);
   const data = await reportingService.getValuationReport(groupBy, limit, offset);
-  return CacheManager.put(c, c.json(data), 120);
+  return CacheManager.put(c, c.json(data), 60);
 });
 
 app.get("/api/reports/dead-stock", authMiddleware, requirePermission('reports.view'), async (c) => {
-  const cached = await CacheManager.get(c, 120);
+  const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const days = parseInt(c.req.query('days') || "90");
   const limit = parseInt(c.req.query('limit') || "50");
   const offset = parseInt(c.req.query('offset') || "0");
   const reportingService = new ReportingService(c.env.DB);
   const data = await reportingService.getDeadStock(days, limit, offset);
-  return CacheManager.put(c, c.json(data), 120);
+  return CacheManager.put(c, c.json(data), 60);
 });
 
 // Stock Counts
@@ -1555,26 +1560,26 @@ app.post("/api/requests/:id/approve", authMiddleware, requirePermission('request
 
 // KPIs
 app.get("/api/kpi/summary", authMiddleware, requirePermission('kpi.view'), async (c) => {
-  const cached = await CacheManager.get(c, 30);
+  const cached = await CacheManager.get(c, 15);
   if (cached) return cached;
   const godownId = c.req.query('godown_id');
   const kpiService = new KPIService(c.env.DB);
   const summary = await kpiService.getWarehouseSummary(godownId);
   
   // Store in KV for cross-region access if available
-  if (c.env['omni-stock']) {
-    await c.env['omni-stock'].put(`kpi_summary_${godownId || 'all'}`, JSON.stringify(summary), { expirationTtl: 60 });
+  if (c.env.KV) {
+    await c.env.KV.put(`kpi_summary_${godownId || 'all'}`, JSON.stringify(summary), { expirationTtl: 60 });
   }
   
-  return CacheManager.put(c, c.json(summary), 30);
+  return CacheManager.put(c, c.json(summary), 15);
 });
 
 app.get("/api/kpi/turnover", authMiddleware, requirePermission('kpi.view'), async (c) => {
-  const cached = await CacheManager.get(c, 120);
+  const cached = await CacheManager.get(c, 60);
   if (cached) return cached;
   const kpiService = new KPIService(c.env.DB);
   const result = await kpiService.getStockTurnover();
-  return CacheManager.put(c, c.json(result), 120);
+  return CacheManager.put(c, c.json(result), 60);
 });
 
 // Attachments
